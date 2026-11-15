@@ -1,0 +1,41 @@
+{
+  "report_generated_at": "2026-11-09 19:46:22",
+  "analysis_period": {
+    "previous_7days": "2026-10-26 ~ 2026-11-01",
+    "current_7days": "2026-11-02 ~ 2026-11-08"
+  },
+  "care_priority": "HIGH (우선 방문 권고)",
+  "comparison_metrics": {
+    "breath_rate_bpm": {
+      "prev_7d": 15.8,
+      "curr_7d": 17.8,
+      "change_pct": 12.7
+    },
+    "total_active_hours": {
+      "prev_7d": 33.7,
+      "curr_7d": 21.8,
+      "change_pct": -35.3
+    },
+    "warning_event_count": {
+      "prev_7d": 7,
+      "curr_7d": 18,
+      "change_pct": 157.1
+    },
+    "emergency_event_count": {
+      "prev_7d": 0,
+      "curr_7d": 0
+    }
+  },
+  "time_of_day_warning_distribution": {
+    "dawn_00_06": 12,
+    "day_06_18": 5,
+    "night_18_24": 1,
+    "most_vulnerable_time": "새벽(00~06시)"
+  },
+  "summary_findings": [
+    "주의 단계(호흡 불규칙) 발생 빈도가 전주 대비 +157.1% 증가했으며, 주로 '새벽(00~06시)' 시간대에 집중되었습니다.",
+    "주간 총 활동 시간이 전주 대비 35.3% 감소하여 기력 저하 및 무활동 증가가 관찰됩니다."
+  ],
+  "retention_policy_result": "14일 경과 상세 데이터 22건 자동 폐기 완료",
+  "disclaimer": "본 리포트는 의료 진단 목적이 아닌 보조적 참고 정보로 제공됩니다."
+}

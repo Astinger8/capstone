@@ -1,0 +1,32 @@
+{
+  "packet_type": "REALTIME_UI_STREAM",
+  "timestamp": "2026-11-09 20:18:01",
+  "status": "WARNING",
+  "action": "SITTING",
+  "position": {
+    "id": 0,
+    "x": -0.05,
+    "y": 1.1,
+    "z": -0.08,
+    "speed": 0.0,
+    "is_moving": false
+  },
+  "vital": {
+    "breath_rate": 9.3,
+    "heart_rate": 53.6,
+    "breath_deviation": 0.0338
+  },
+  "valid_point_count": 2,
+  "point_cloud": [
+    [
+      -2.17,
+      1.98,
+      0.97
+    ],
+    [
+      -0.76,
+      2.13,
+      -0.8
+    ]
+  ]
+}
