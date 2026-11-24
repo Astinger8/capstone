@@ -1,6 +1,6 @@
 # PostgreSQL과 레이더 수신 API
 
-레이더가 생성한 상세 이벤트와 주기별 요약을 PostgreSQL에 저장하고, 돌봄 모니터링 화면에서 주간 호흡수와 활동 기록을 조회합니다. [ERD와 데이터 사전](docs/PostgreSQL_ERD_데이터사전.md)에서 테이블 관계와 필드를 확인할 수 있습니다.
+레이더가 생성한 상세 이벤트와 주기별 요약을 PostgreSQL에 저장하고, 조회 API로 주간 호흡수와 활동 기록을 제공합니다. [ERD와 데이터 사전](docs/PostgreSQL_ERD_데이터사전.md)에서 테이블 관계와 필드를 확인할 수 있습니다.
 
 ## 새 로컬 DB 준비
 
@@ -26,11 +26,13 @@ python -m venv .venv
 
 [API 테스트 화면](http://127.0.0.1:8000/docs)에서 `POST /api/v1/vital-events`와 `POST /api/v1/vital-summary`를 실행할 수 있습니다. 요청마다 JSON 객체 한 건을 보냅니다. `subject_id`를 생략하면 기본 시연 대상자가 사용됩니다. 동일한 `source_id`와 `message_id`로 같은 요청을 재전송하면 기존 기록 번호가 반환됩니다. 같은 ID로 내용을 바꾸면 `409`가 반환됩니다.
 
-[돌봄 모니터링 화면](http://127.0.0.1:8000/care-monitor)에서 가상 대상자 4명의 기록을 확인하려면, 대상자 1번을 등록한 뒤 다음 명령을 실행하고 기준일을 `2026-11-09`로 선택합니다.
+가상 대상자 4명의 기록으로 조회 API를 시험하려면, 대상자 1번을 등록한 뒤 다음 명령을 실행합니다.
 
 ```powershell
 .\.venv\Scripts\python.exe seed_care_demo.py
 ```
+
+`GET /api/v1/care-subjects`에서 대상자 번호를 확인한 뒤 `GET /api/v1/care-report`에 해당 `subject_id`와 `report_date=2026-11-09`를 지정합니다.
 
 ## API 테스트
 

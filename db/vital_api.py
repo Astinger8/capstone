@@ -4,12 +4,9 @@ import logging
 import os
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
-from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from breathing_report import DEMO_REPORT_DATE, load_daily_readings, report_payload
@@ -23,23 +20,6 @@ PacketIdentifier = Annotated[str, Field(min_length=1, max_length=128, pattern=r"
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Capstone Vital API", version="0.1.0")
-dashboard_dir = Path(__file__).resolve().parent / "web"
-app.mount("/dashboard-assets", StaticFiles(directory=dashboard_dir), name="dashboard-assets")
-
-
-@app.get("/", include_in_schema=False)
-def breathing_dashboard() -> FileResponse:
-    return FileResponse(dashboard_dir / "index.html", media_type="text/html")
-
-
-@app.get("/care-monitor", include_in_schema=False)
-def care_monitor() -> FileResponse:
-    return FileResponse(dashboard_dir / "care-monitor.html", media_type="text/html")
-
-
-@app.get("/care-monitor-original", include_in_schema=False)
-def care_monitor_original() -> FileResponse:
-    return FileResponse(dashboard_dir / "care-monitor-original.html", media_type="text/html")
 
 
 class Packet(BaseModel):
