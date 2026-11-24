@@ -1,0 +1,1610 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>온결 | 독거노인 통합 돌봄 모니터링</title>
+
+  <style>
+    :root {
+      --primary: #1751d0;
+      --text: #1e2433;
+      --muted: #505a74;
+      --border: #e2e6f0;
+      --background: #f3f5f9;
+      --surface: #fdfdff;
+      --warning: #a87f00;
+      --serious: #c24e00;
+      --danger: #c1232c;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #e8edf4;
+      color: var(--text);
+      font-family: Arial, "Malgun Gothic", sans-serif;
+    }
+
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+
+    button:focus-visible, input:focus-visible {
+      outline: 3px solid #1751d0;
+      outline-offset: 3px;
+    }
+
+    button {
+      color: inherit;
+      border: 0;
+      background: none;
+    }
+
+    /* 화면 전체를 창 크기에 맞춰 축소하므로 페이지 스크롤이 생기지 않습니다. */
+    #app {
+      position: absolute;
+      width: 1440px;
+      height: 880px;
+      display: grid;
+      grid-template-rows: 70px 92px minmax(0, 1fr) 30px;
+      overflow: hidden;
+      transform-origin: top left;
+      background: var(--background);
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      padding: 0 24px;
+      background: white;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 25px;
+      font-weight: 800;
+    }
+
+    .brand-icon {
+      display: grid;
+      place-items: center;
+      width: 35px;
+      height: 35px;
+      border-radius: 11px;
+      background: var(--primary);
+      color: white;
+    }
+
+    .brand small {
+      display: block;
+      margin-top: 1px;
+      color: var(--muted);
+      font-size: 9px;
+      letter-spacing: 2px;
+    }
+
+    .divider {
+      width: 1px;
+      height: 27px;
+      margin: 0 7px;
+      background: var(--border);
+    }
+
+    h1 { margin: 0; font-size: 18px; }
+    .spacer { flex: 1; }
+    .muted { color: var(--muted); }
+    .small { font-size: 11px; line-height: 1.7; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: white;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .btn:hover { background: #edf3ff; }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+
+    .btn.primary {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+
+    .link {
+      padding: 0;
+      color: #1241a6;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 7px;
+      border-radius: 5px;
+      background: #edf1f6;
+      font-size: 10px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .badge::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #818ba0;
+    }
+
+    .badge.blue { background: #eaf0fd; }
+    .badge.blue::before { background: var(--primary); }
+    .badge.orange { background: #fff0e6; }
+    .badge.orange::before { background: var(--serious); }
+    .badge[data-status="normal"]::before { background: #1aa612; }
+    .badge[data-status="warning"]::before { background: var(--warning); }
+    .badge[data-status="emergency"]::before { background: var(--danger); }
+
+    .overview {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1.55fr;
+      gap: 12px;
+      padding: 14px 22px;
+    }
+
+    .overview-card {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      padding: 10px 15px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: white;
+      text-align: left;
+    }
+
+    .overview-icon {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: #edf3ff;
+      color: var(--primary);
+      font-size: 19px;
+    }
+
+    .overview-card strong {
+      margin-left: auto;
+      font-size: 28px;
+    }
+
+    .overview-label { font-size: 12px; font-weight: 700; }
+    .overview-note { margin-top: 4px; font-size: 10px; color: var(--muted); }
+
+    .data-note {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-left: 7px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.7;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: 224px minmax(0, 1fr) 286px;
+      gap: 13px;
+      min-height: 0;
+      padding: 0 22px 12px;
+    }
+
+    .panel {
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      background: var(--surface);
+    }
+
+    .title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin: 0;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .sidebar { display: flex; flex-direction: column; padding: 16px 12px; }
+
+    .search {
+      width: 100%;
+      margin: 14px 0 10px;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: #f8fafc;
+      font-size: 12px;
+    }
+
+    .filters { display: flex; gap: 5px; margin-bottom: 12px; }
+
+    .filter {
+      padding: 6px 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 10px;
+    }
+
+    .filter.active {
+      background: #eaf0fd;
+      border-color: #b9cdf3;
+      color: #1241a6;
+    }
+
+    .resident-list { display: flex; flex-direction: column; gap: 8px; }
+
+    .resident {
+      width: 100%;
+      padding: 12px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: white;
+      text-align: left;
+    }
+
+    .resident:hover { background: #f5f8ff; }
+
+    .resident.selected {
+      background: #edf3ff;
+      border-color: #8faeea;
+      box-shadow: inset 3px 0 var(--primary);
+    }
+
+    .resident-top { display: flex; align-items: center; gap: 9px; }
+
+    .avatar {
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: #e5ecf7;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .resident-name { font-size: 13px; font-weight: 700; }
+    .resident-id { margin-top: 4px; color: var(--muted); font-size: 10px; }
+    .resident-status { margin-top: 10px; font-size: 10px; color: var(--muted); }
+
+    .sidebar-foot {
+      margin-top: auto;
+      padding-top: 13px;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.8;
+    }
+
+    .center {
+      display: grid;
+      grid-template-rows: 54px minmax(0, 1fr) 190px;
+      gap: 12px;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .person-header { display: flex; align-items: center; gap: 11px; }
+    .person-header .avatar { width: 43px; height: 43px; }
+    .person-header h2 { margin: 0; font-size: 21px; }
+    .person-header p { margin: 5px 0 0; font-size: 10px; color: var(--muted); }
+
+    .space-panel { display: flex; flex-direction: column; background: #f8fafc; }
+
+    .space-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 13px 15px;
+      background: white;
+    }
+
+    .view-controls { display: flex; gap: 5px; margin-left: auto; }
+    .view-controls .btn { padding: 5px 8px; font-size: 10px; }
+    .view-controls .active { background: #eaf0fd; border-color: #b9cdf3; }
+
+    .canvas-wrap { position: relative; flex: 1; min-height: 0; }
+    #roomCanvas { display: block; width: 100%; height: 100%; }
+
+    .space-note {
+      position: absolute;
+      top: 8px;
+      left: 15px;
+      pointer-events: none;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.7;
+    }
+
+    .space-legend {
+      position: absolute;
+      top: 8px;
+      right: 13px;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.8;
+      pointer-events: none;
+    }
+
+    .space-footer {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 15px;
+      border-top: 1px solid var(--border);
+      background: white;
+    }
+
+    .space-footer .btn { font-size: 10px; padding: 7px 9px; }
+
+    .bottom-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      min-height: 0;
+    }
+
+    .metric-card { display: flex; flex-direction: column; gap: 8px; padding: 13px; }
+    .metric-number { font-size: 25px; font-weight: 700; }
+    .metric-number small { font-size: 10px; font-weight: 400; color: var(--muted); }
+    .chart-wrap { position: relative; flex: 1; min-height: 0; }
+    .chart-wrap svg { width: 100%; height: 100%; display: block; }
+    .trend-chart { width: 100%; height: auto; display: block; margin: 12px 0; }
+    .report-date { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+    .report-date input { max-width: 125px; border: 1px solid var(--border); border-radius: 6px; padding: 6px; color: var(--text); }
+    .resident-status[data-level="emergency"] { color: var(--danger); font-weight: 700; }
+    .resident-status[data-level="warning"] { color: #85530a; font-weight: 700; }
+    .event-list { overflow: auto; min-height: 0; }
+    .state-main[data-level="emergency"] { color: var(--danger); }
+    .state-main[data-level="warning"] { color: #85530a; }
+
+    .metric-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 11px;
+    }
+
+    .right {
+      display: grid;
+      grid-template-rows: 180px 174px minmax(0, 1fr);
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .state-panel, .priority-panel, .events-panel { padding: 16px; }
+    .state-main { margin: 17px 0 15px; font-size: 25px; font-weight: 700; }
+
+    .state-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    .state-grid > div {
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .state-grid strong { display: block; margin-top: 6px; color: var(--text); font-size: 14px; }
+
+    .priority-panel {
+      background: #fffaf5;
+      border-top: 3px solid var(--serious);
+    }
+
+    .priority-main { margin: 14px 0 9px; font-size: 21px; font-weight: 700; }
+
+    .events-panel { display: flex; flex-direction: column; }
+    .event-list { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; }
+    .event { padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 11px; }
+    .event span { display: block; margin-top: 5px; color: var(--muted); font-size: 10px; }
+
+    .empty {
+      display: grid;
+      place-content: center;
+      min-height: 110px;
+      color: var(--muted);
+      text-align: center;
+      font-size: 11px;
+      line-height: 1.9;
+    }
+
+    .events-foot {
+      margin-top: auto;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.7;
+    }
+
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 24px 7px;
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .modal-backdrop {
+      position: absolute;
+      inset: 0;
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 35px;
+      background: rgba(30, 36, 51, .46);
+    }
+
+    .modal-backdrop.open { display: flex; }
+
+    .modal {
+      display: flex;
+      flex-direction: column;
+      width: 900px;
+      max-height: 790px;
+      overflow: hidden;
+      border-radius: 13px;
+      background: white;
+      box-shadow: 0 25px 80px #0003;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      padding: 20px 25px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .modal-header h2 { margin: 0; font-size: 20px; }
+    .modal-header p { margin: 6px 0 0; color: var(--muted); font-size: 11px; }
+    .close-button { margin-left: auto; padding: 3px 9px; font-size: 26px; }
+
+    .modal-body {
+      min-height: 150px;
+      overflow: auto;
+      padding: 22px 25px;
+      font-size: 13px;
+      line-height: 1.8;
+    }
+
+    .modal-body h3 { margin: 20px 0 10px; font-size: 15px; }
+    .modal-body h3:first-child { margin-top: 0; }
+    .modal-body p { color: var(--muted); }
+
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      padding: 13px 25px;
+      border-top: 1px solid var(--border);
+      background: #fafbfd;
+    }
+
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { padding: 11px 9px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { background: #f3f5f9; color: var(--muted); }
+
+    .notice {
+      margin-bottom: 14px;
+      padding: 13px 15px;
+      border: 1px solid #dce5f6;
+      border-radius: 8px;
+      background: #f0f5ff;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .notice.warning { background: #fff8ef; border-color: #efdfc9; }
+
+    pre {
+      overflow: auto;
+      padding: 16px;
+      border-radius: 8px;
+      background: #1e2433;
+      color: #f7f9fc;
+      font-size: 11px;
+      line-height: 1.8;
+    }
+  </style>
+</head>
+
+<body>
+<div id="app">
+  <header class="header">
+    <div class="brand">
+      <span class="brand-icon" aria-hidden="true">∿</span>
+      <div>온결<small>CARE MONITOR</small></div>
+    </div>
+    <div class="divider"></div>
+    <h1>통합 돌봄 모니터링</h1>
+    <span class="badge blue">UI 프로토타입</span>
+    <span class="spacer"></span>
+    <span class="small muted">한 명의 사회복지사를 위한 다중 대상자 관찰 화면</span>
+    <button class="btn" data-detail="guide">공간·센서 연동 안내</button>
+    <div class="avatar" title="담당 사회복지사">담당</div>
+  </header>
+
+  <section class="overview" aria-label="전체 대상자 현황">
+    <button class="overview-card" id="summaryAll">
+      <span class="overview-icon">◫</span>
+      <div>
+        <div class="overview-label">담당 대상자</div>
+        <div class="overview-note">DB에 등록된 대상자</div>
+      </div>
+      <strong id="subjectCount">—</strong>
+    </button>
+
+    <button class="overview-card" id="summaryPriority">
+      <span class="overview-icon" style="background:#fff0e6;color:#c24e00;">!</span>
+      <div>
+        <div class="overview-label">우선 확인</div>
+        <div class="overview-note">실시간 주의·응급 대상자</div>
+      </div>
+      <strong id="priorityCount">0</strong>
+    </button>
+
+    <div class="overview-card">
+      <span class="overview-icon">⌁</span>
+      <div>
+        <div class="overview-label">실시간 연결</div>
+        <div class="overview-note">최근 30초 이내 수신</div>
+      </div>
+      <strong id="connectedCount">0</strong>
+    </div>
+
+    <div class="data-note">
+      <span class="badge">데이터 구분</span>
+      <div>
+        <span id="loadStatus" role="status">DB에서 대상자 목록을 불러오는 중</span><br>
+        공간과 움직임 데모는 예시입니다.
+      </div>
+    </div>
+  </section>
+
+  <main class="workspace">
+    <aside class="panel sidebar">
+      <h2 class="title">담당 대상자 <span id="subjectBadge" class="badge">—</span></h2>
+      <input id="search" class="search" type="search"
+             placeholder="대상자 또는 관리번호 검색" aria-label="대상자 검색">
+
+      <div class="filters" aria-label="대상자 필터">
+        <button class="filter active" data-filter="all" aria-pressed="true">전체</button>
+        <button class="filter" data-filter="priority" aria-pressed="false">우선 확인</button>
+        <button class="filter" data-filter="offline" aria-pressed="false">미연결</button>
+      </div>
+
+      <nav id="residentList" class="resident-list" aria-label="대상자 선택"></nav>
+
+      <div class="sidebar-foot">
+        <b>대상자를 선택해 상세 상태를 확인하세요.</b><br>
+        <span id="listCount">목록을 불러오는 중</span>
+      </div>
+    </aside>
+
+    <section class="center">
+      <div class="person-header">
+        <div id="selectedAvatar" class="avatar">—</div>
+        <div>
+          <h2 id="selectedName">대상자 선택</h2>
+          <p id="selectedMeta">DB 연결 대기</p>
+        </div>
+        <span class="spacer"></span>
+        <label class="report-date">비교 기준 월요일 <input id="reportDate" type="date" value="2026-11-09"></label>
+        <button class="btn" id="refreshReport">다시 조회</button>
+        <button class="btn" data-detail="report">주간 리포트 ↗</button>
+      </div>
+
+      <article class="panel space-panel">
+        <header class="space-header">
+          <h3 class="title">공간 모니터링</h3>
+          <span id="spaceBadge" class="badge">공간 예시 · 미연결</span>
+          <div class="view-controls">
+            <button id="isoButton" class="btn active" aria-pressed="true">3D</button>
+            <button id="topButton" class="btn" aria-pressed="false">평면</button>
+            <button id="resetButton" class="btn" aria-label="공간 시점 초기화">↺</button>
+          </div>
+        </header>
+
+        <div id="canvasWrap" class="canvas-wrap">
+          <canvas id="roomCanvas" role="img"
+                  aria-label="예시 주거 공간. 실제 위치 데이터 수신 대기."></canvas>
+          <div class="space-note">
+            예시 공간 6 × 5m<br>
+            실제 평면·감지 범위가 아닙니다.
+          </div>
+          <div class="space-legend">
+            <span style="color:#1751d0;">●</span> 센서 배치 예시<br>
+            <span id="positionLegend">○ 실제 위치 데이터 없음</span>
+          </div>
+        </div>
+
+        <footer class="space-footer">
+          <span id="spaceStatus" class="small muted">실제 움직임 데이터 수신 대기</span>
+          <span class="spacer"></span>
+          <button id="demoButton" class="btn">▷ 움직임 데모</button>
+          <button class="link" data-detail="guide">연동 안내 ↗</button>
+        </footer>
+      </article>
+
+      <section class="bottom-grid">
+        <article class="panel metric-card">
+          <h3 class="title">
+            주간 평균 호흡수
+            <button class="link" data-detail="breath">상세 ↗</button>
+          </h3>
+          <div class="metric-number"><span id="breathValue">—</span> <small>회/분</small></div>
+          <div class="chart-wrap" id="breathChart"></div>
+          <div id="breathNote" class="small muted"></div>
+        </article>
+
+        <article class="panel metric-card">
+          <h3 class="title">
+            핵심 주간 지표
+            <button class="link" data-detail="metrics">상세 ↗</button>
+          </h3>
+          <div id="metricSummary"></div>
+          <div class="small muted" style="margin-top:auto;">현재 상태가 아닌 주간 집계입니다.</div>
+        </article>
+
+        <article class="panel metric-card">
+          <h3 class="title">
+            주의 로그 시간대
+            <button class="link" data-detail="distribution">상세 ↗</button>
+          </h3>
+          <div class="metric-number"><span id="warningValue">—</span> <small>건 · 직전 주</small></div>
+          <div class="chart-wrap" id="warningChart"></div>
+          <div id="warningNote" class="small muted"></div>
+        </article>
+      </section>
+    </section>
+
+    <aside class="right">
+      <article class="panel state-panel">
+        <h2 class="title">현재 사용자 상태 <span id="liveBadge" class="badge">미연결</span></h2>
+        <div id="currentState" class="state-main">확인 대기</div>
+        <div class="state-grid">
+          <div>현재 호흡수<strong id="liveBreath">—</strong></div>
+          <div>현재 위치<strong id="livePosition">수신 대기</strong></div>
+        </div>
+        <div id="lastReceived" class="small muted" style="margin-top:9px;">실시간 센서 데이터 없음</div>
+      </article>
+
+      <article class="panel priority-panel">
+        <h2 class="title">돌봄 우선순위 <span class="badge orange">주간 기준</span></h2>
+        <div id="priorityText" class="priority-main">평가 기준 미설정</div>
+        <div id="priorityDescription" class="small muted"></div>
+        <button class="link" data-detail="findings" style="margin-top:11px;">주간 비교 보기 ↗</button>
+      </article>
+
+      <article class="panel events-panel">
+        <h2 class="title">
+          최근 이벤트
+          <button class="link" data-detail="events">이력 조회 ↗</button>
+        </h2>
+        <div id="eventList" class="event-list"></div>
+        <div class="events-foot">
+          DB에 저장된 최근 수신 로그를 표시합니다.
+        </div>
+      </article>
+    </aside>
+  </main>
+
+  <footer class="footer">
+    <span id="reportTimestamp"></span>
+    <span>의료 진단이 아닌 보조 참고 정보 · <button class="link" data-detail="data">데이터 관리</button></span>
+  </footer>
+
+  <div id="modalBackdrop" class="modal-backdrop" aria-hidden="true">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <header class="modal-header">
+        <div>
+          <h2 id="modalTitle">상세 정보</h2>
+          <p id="modalSubtitle"></p>
+        </div>
+        <button id="closeModal" class="close-button" aria-label="상세 창 닫기">×</button>
+      </header>
+      <div id="modalBody" class="modal-body"></div>
+      <footer class="modal-footer">
+        <button id="closeModalBottom" class="btn">닫기</button>
+      </footer>
+    </section>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const $ = id => document.getElementById(id);
+  const residents = [];
+  const emptyResident = { name: "대상자 없음", id: "", report: null, frame: null, trail: [] };
+  const labels = { normal: "정상", warning: "주의", emergency: "응급", unknown: "판단 정보 없음" };
+  const poseLabels = { standing: "서 있음", walking: "걷는 중", sitting: "앉아 있음", lying: "누워 있음" };
+  const demoPoses = ["walking", "standing", "sitting", "lying"];
+  const timeBuckets = [["dawn", "새벽", "00~06시"], ["day", "낮", "06~18시"], ["night", "밤", "18~24시"]];
+  const dateFormat = new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul", dateStyle: "short", timeStyle: "medium"
+  });
+  let requestNumber = 0;
+
+  let selectedIndex = 0;
+  let filter = "all";
+  let viewMode = "iso";
+  let demoPlaying = false;
+  let demoTime = 0;
+  let previousAnimationTime = 0;
+  let previousFocus = null;
+  let roomWidth = 0;
+  let roomHeight = 0;
+
+  const roomCanvas = $("roomCanvas");
+  const ctx = roomCanvas.getContext("2d");
+  const current = () => residents[selectedIndex] ?? emptyResident;
+
+  const isNumber = value =>
+    typeof value === "number" && Number.isFinite(value);
+
+  const valueText = value => isNumber(value) ? String(value) : "—";
+
+  const formatBreath = value => isNumber(value) ? value.toFixed(1) + " 회/분" : "미측정";
+  function formatActivity(week) {
+    const seconds = week.average_daily_activity_seconds;
+    if (!isNumber(seconds)) return "기록 없음";
+    const amount = seconds < 60 ? Number(seconds.toFixed(2)) + "초"
+      : seconds < 3600 ? (seconds / 60).toFixed(1) + "분"
+        : (seconds / 3600).toFixed(2) + "시간";
+    return amount + "/일 · " + week.activity_days + "/7일";
+  }
+  const formatCount = value => isNumber(value) ? value + "건" : "—";
+  const weekRange = week => week.start_date + " ~ " + week.end_date;
+  const difference = value => !isNumber(value) ? "비교 불가"
+    : (value > 0 ? "+" : "") + value.toFixed(1) + " 회/분";
+
+  const escapeHTML = value =>
+    String(value ?? "").replace(/[&<>"']/g, char => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;",
+      '"': "&quot;", "'": "&#39;"
+    }[char]));
+
+  const connected = resident =>
+    Boolean(resident.frame && Date.now() - resident.lastReceived < 30000);
+
+  const level = resident => connected(resident) ? resident.frame.status : "offline";
+  const highPriority = resident => ["emergency", "warning"].includes(level(resident));
+  const formatEventTime = iso => dateFormat.format(new Date(iso));
+
+  /* 전체 레이아웃을 화면에 맞춤: 본문 스크롤 없음. */
+  function fitScreen() {
+    const scale = Math.min(window.innerWidth / 1440, window.innerHeight / 880);
+    $("app").style.transform = `scale(${scale})`;
+    $("app").style.left = `${(window.innerWidth - 1440 * scale) / 2}px`;
+    $("app").style.top = `${(window.innerHeight - 880 * scale) / 2}px`;
+  }
+
+  function renderResidents() {
+    const query = $("search").value.trim().toLowerCase();
+
+    const order = { emergency: 0, warning: 1, normal: 2, unknown: 3, offline: 4 };
+    const visible = residents.map((resident, index) => ({ resident, index }))
+      .sort((a, b) => order[level(a.resident)] - order[level(b.resident)])
+      .filter(({ resident }) =>
+        `${resident.name} ${resident.id}`.toLowerCase().includes(query) &&
+        (
+          filter === "all" ||
+          (filter === "priority" && highPriority(resident)) ||
+          (filter === "offline" && !connected(resident))
+        )
+      );
+
+    $("residentList").innerHTML = visible.map(({ resident, index }) => {
+      const status = connected(resident) ? labels[level(resident)] : "센서 미연결";
+
+      return `
+        <button class="resident ${index === selectedIndex ? "selected" : ""}"
+                data-person="${index}" aria-pressed="${index === selectedIndex}">
+          <div class="resident-top">
+            <div class="avatar">${String(index + 1).padStart(2, "0")}</div>
+            <div>
+              <div class="resident-name">${escapeHTML(resident.name)}</div>
+              <div class="resident-id">${resident.id}</div>
+            </div>
+          </div>
+          <div class="resident-status" data-level="${level(resident)}">${status}</div>
+        </button>`;
+    }).join("") || '<div class="empty">검색 결과가 없습니다.</div>';
+
+    $("listCount").textContent = `표시 ${visible.length} / 전체 ${residents.length}`;
+    $("priorityCount").textContent = residents.filter(highPriority).length;
+    $("connectedCount").textContent = residents.filter(connected).length;
+
+    document.querySelectorAll("[data-filter]").forEach(button => {
+      const active = button.dataset.filter === filter;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", String(active));
+    });
+  }
+
+  function renderDashboard() {
+    const resident = current();
+    const report = resident.report;
+    const previous = report?.previous_week;
+    const recent = report?.recent_week;
+
+    $("selectedAvatar").textContent = resident.id ? String(selectedIndex + 1).padStart(2, "0") : "—";
+    $("selectedName").textContent = resident.name;
+    $("selectedMeta").textContent = resident.id
+      ? resident.id + " · " + (report ? "DB 조회 완료" : "주간 데이터 조회 대기")
+      : "등록된 대상자가 필요합니다";
+
+    $("breathValue").textContent = isNumber(recent?.average_bpm) ? recent.average_bpm.toFixed(1) : "—";
+    $("warningValue").textContent = valueText(recent?.warning_log_count);
+    $("breathNote").textContent = report
+      ? "그 이전 주 " + formatBreath(previous.average_bpm) + " · " + difference(report.comparison.average_change_bpm)
+      : "주간 호흡수 조회 대기";
+    $("warningNote").textContent = report
+      ? "그 이전 주 " + formatCount(previous.warning_log_count) + " → 직전 주 " + formatCount(recent.warning_log_count)
+      : "시간대별 로그 조회 대기";
+    $("metricSummary").innerHTML = recent
+      ? [
+          ["일평균 활동", formatActivity(recent)],
+          ["주의 로그", formatCount(recent.warning_log_count)],
+          ["응급 로그", formatCount(recent.emergency_log_count)]
+        ].map(([label, value]) =>
+          `<div class="metric-row"><span>${label}</span><strong>${value}</strong></div>`
+        ).join("")
+      : '<div class="empty">주간 지표 조회 대기</div>';
+
+    $("priorityDescription").textContent = "두 주의 지표와 최근 이벤트를 함께 확인하세요.";
+    $("reportTimestamp").textContent = report
+      ? weekRange(previous) + " / " + weekRange(recent) + " · 한국 시간"
+      : "주간 리포트 조회 대기";
+
+    renderResidents();
+    $("breathChart").innerHTML = report ? breathingTrend(report.daily, true) : "";
+    $("warningChart").innerHTML = report ? warningChart(previous, recent) : "";
+    renderLive();
+    drawRoom();
+  }
+
+  function breathingTrend(days, compact = false) {
+    const measured = days.map(day => day.average_bpm).filter(isNumber);
+    if (!measured.length) return '<p class="small muted">이 기간에 유효한 호흡수 기록이 없습니다.</p>';
+    const width = compact ? 250 : 660;
+    const height = compact ? 72 : 200;
+    const left = compact ? 8 : 44;
+    const right = width - 10;
+    const top = compact ? 9 : 32;
+    const bottom = height - (compact ? 7 : 32);
+    const minimum = Math.max(0, Math.floor(Math.min(...measured)) - 1);
+    const maximum = Math.max(minimum + 2, Math.ceil(Math.max(...measured)) + 1);
+    const step = (right - left) / days.length;
+    const split = left + step * 7;
+    const x = index => left + step * (index + .5);
+    const y = value => bottom - (value - minimum) / (maximum - minimum) * (bottom - top);
+    const colors = ["#6177a2", "#1751d0"];
+
+    const segments = days.map((day, index) => {
+      const prior = days[index - 1]?.average_bpm;
+      if (!isNumber(prior) || !isNumber(day.average_bpm)) return "";
+      return `<line x1="${x(index - 1)}" y1="${y(prior)}" x2="${x(index)}" y2="${y(day.average_bpm)}"
+                    stroke="${colors[Number(index >= 7)]}" stroke-width="2.5"${index === 7 ? ' stroke-dasharray="4 3"' : ""}/>`;
+    }).join("");
+    const points = days.map((day, index) => isNumber(day.average_bpm)
+      ? `<circle cx="${x(index)}" cy="${y(day.average_bpm)}" r="${compact ? 2 : 3.5}" fill="${colors[Number(index >= 7)]}">
+           <title>${escapeHTML(day.date)} · ${formatBreath(day.average_bpm)}</title>
+         </circle>` : "").join("");
+    const axes = compact ? "" : `
+      <text x="${(left + split) / 2}" y="21" text-anchor="middle">그 이전 주</text>
+      <text x="${(split + right) / 2}" y="21" text-anchor="middle">직전 주</text>
+      ${[minimum, (minimum + maximum) / 2, maximum].map(tick => `
+        <line x1="${left}" x2="${right}" y1="${y(tick)}" y2="${y(tick)}" stroke="#d5dfec"/>
+        <text x="${left - 8}" y="${y(tick) + 4}" text-anchor="end">${tick}</text>`).join("")}
+      ${days.map((day, index) => `<text x="${x(index)}" y="${height - 9}" text-anchor="middle">${escapeHTML(day.date.slice(5))}</text>`).join("")}`;
+    return `<svg class="${compact ? "" : "trend-chart"}" viewBox="0 0 ${width} ${height}" role="img"
+                 aria-label="14일 날짜별 평균 호흡수 그래프, 단위 회/분" fill="#505a74" font-size="12">
+      <rect x="${left}" y="0" width="${split - left}" height="${bottom}" rx="5" fill="#eef1f7"/>
+      <rect x="${split}" y="0" width="${right - split}" height="${bottom}" rx="5" fill="#eaf1ff"/>
+      <line x1="${split}" x2="${split}" y1="${top}" y2="${bottom}" stroke="#869bbd" stroke-dasharray="4 4"/>
+      ${axes}${segments}${points}
+    </svg>`;
+  }
+
+  function warningChart(previous, recent) {
+    const maximum = Math.max(1, ...timeBuckets.flatMap(([key]) =>
+      [previous.warning_logs_by_time[key], recent.warning_logs_by_time[key]]));
+    const bars = timeBuckets.map(([key, label], index) => {
+      const x = 38 + index * 73;
+      const old = previous.warning_logs_by_time[key];
+      const next = recent.warning_logs_by_time[key];
+      const oldHeight = old / maximum * 46;
+      const nextHeight = next / maximum * 46;
+      return `
+        <g><title>${label} · 그 이전 주 ${old}건 · 직전 주 ${next}건</title>
+          <rect x="${x - 16}" y="${54 - oldHeight}" width="14" height="${oldHeight}" rx="2" fill="#6177a2"/>
+          <rect x="${x + 2}" y="${54 - nextHeight}" width="14" height="${nextHeight}" rx="2" fill="#1751d0"/>
+          <text x="${x}" y="70" text-anchor="middle">${label}</text>
+        </g>`;
+    }).join("");
+    return `<svg viewBox="0 0 222 76" role="img" aria-label="시간대별 주의 로그 비교. 자세한 값은 상세에서 확인"
+                 fill="#505a74" font-size="11">
+      <line x1="8" x2="214" y1="54" y2="54" stroke="#ccd7e6"/>${bars}
+    </svg>`;
+  }
+
+  function renderLive() {
+    const resident = current();
+    const frame = connected(resident) ? resident.frame : null;
+    const status = frame?.status || "unknown";
+    $("liveBadge").textContent = frame ? "센서 수신" : "미연결";
+    $("liveBadge").dataset.status = status;
+    $("currentState").textContent = frame ? labels[status] : "확인 대기";
+    $("currentState").dataset.level = status;
+    $("liveBreath").textContent = isNumber(frame?.breath_rate_bpm)
+      ? `${frame.breath_rate_bpm} 회/분` : "—";
+    $("livePosition").textContent = frame?.position
+      ? `${frame.position.x.toFixed(1)}, ${frame.position.z.toFixed(1)}m`
+      : "수신 대기";
+
+    $("lastReceived").textContent = frame
+      ? `최근 수신 ${formatEventTime(resident.lastReceived)}${frame.pose ? " · " + poseLabels[frame.pose] : ""}`
+      : "실시간 데이터 없음 또는 30초 이상 미수신";
+
+    $("spaceBadge").textContent = frame
+      ? "센서 수신 · 예시 평면"
+      : demoPlaying ? "동작 데모 · 실제 위치 아님" : "공간 예시 · 미연결";
+
+    $("spaceStatus").textContent = frame
+      ? "수신 좌표 표시 중 · 평면은 예시입니다."
+      : demoPlaying ? "가상 움직임 재생 중 · 실제 관측이 아닙니다." : "실제 움직임 데이터 수신 대기";
+
+    $("positionLegend").textContent = frame?.position
+      ? "● 수신된 센서 위치"
+      : demoPlaying ? "● 데모 인물 / 이동 경로" : "○ 실제 위치 데이터 없음";
+
+    $("demoButton").textContent = demoPlaying ? "Ⅱ 데모 중지" : "▷ 움직임 데모";
+    $("demoButton").disabled = Boolean(frame);
+
+    const logs = resident.report?.event_logs ?? [];
+    $("eventList").innerHTML = logs.length
+      ? logs.slice(0, 3).map(log => `
+          <div class="event">
+            <strong>${escapeHTML(log.event_type)} · ${escapeHTML(log.status_level)}</strong>
+            <span>${escapeHTML(formatEventTime(log.logged_at))}</span>
+          </div>`).join("")
+      : '<div class="empty">' + (resident.report ? "저장된 이벤트 로그 없음" : "이벤트 로그 조회 대기") + '</div>';
+  }
+
+  function resizeRoom() {
+    roomWidth = $("canvasWrap").clientWidth;
+    roomHeight = $("canvasWrap").clientHeight;
+    const ratio = Math.min(window.devicePixelRatio || 1, 2);
+    roomCanvas.width = Math.round(roomWidth * ratio);
+    roomCanvas.height = Math.round(roomHeight * ratio);
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    drawRoom();
+  }
+
+  function project(x, z, height = 0) {
+    const scale = Math.min(roomWidth / 12.5, roomHeight / 7.7);
+    if (viewMode === "top") {
+      return [
+        roomWidth / 2 + (x - 3) * scale * 1.2,
+        roomHeight * .55 + (z - 2.5) * scale * 1.2
+      ];
+    }
+    return [
+      roomWidth / 2 + (x - z - .5) * scale,
+      roomHeight * .56 + (x + z - 5.5) * scale * .43 - height * scale
+    ];
+  }
+
+  function polygon(points, fill, stroke = "#c8d3e2") {
+    ctx.beginPath();
+    points.forEach((point, index) => {
+      const p = project(...point);
+      index ? ctx.lineTo(...p) : ctx.moveTo(...p);
+    });
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    if (stroke) {
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = .8;
+      ctx.stroke();
+    }
+  }
+
+  function line(a, b, color = "#dce4ee") {
+    ctx.beginPath();
+    ctx.moveTo(...project(...a));
+    ctx.lineTo(...project(...b));
+    ctx.strokeStyle = color;
+    ctx.lineWidth = .8;
+    ctx.stroke();
+  }
+
+  function box(x, z, width, depth, height, color) {
+    if (viewMode === "iso") {
+      polygon([
+        [x, z + depth, 0], [x + width, z + depth, 0],
+        [x + width, z + depth, height], [x, z + depth, height]
+      ], "#c8d4e3");
+
+      polygon([
+        [x + width, z, 0], [x + width, z + depth, 0],
+        [x + width, z + depth, height], [x + width, z, height]
+      ], "#b9c8db");
+    }
+
+    polygon([
+      [x, z, height], [x + width, z, height],
+      [x + width, z + depth, height], [x, z + depth, height]
+    ], color);
+  }
+
+  function textAt(text, x, z, height = 0) {
+    const p = project(x, z, height);
+    ctx.font = "10px Arial, 'Malgun Gothic', sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#505a74";
+    ctx.fillText(text, p[0], p[1]);
+  }
+
+  function drawSensor(x, z, label) {
+    const height = viewMode === "iso" ? 1.9 : 0;
+    if (viewMode === "iso") {
+      polygon([
+        [x, z, height],
+        [Math.max(0, x - 1.8), Math.min(5, z + 2.8), 0],
+        [Math.min(6, x + 1.8), Math.min(5, z + 2.8), 0]
+      ], "rgba(23,81,208,.045)", null);
+    }
+    const p = project(x, z, height);
+    ctx.beginPath();
+    ctx.arc(p[0], p[1], 5, 0, Math.PI * 2);
+    ctx.fillStyle = "#1751d0";
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(p[0], p[1], 10, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.strokeStyle = "#1751d0";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    const labelPosition = project(x, z, height);
+    ctx.font = "9px Arial, 'Malgun Gothic', sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#505a74";
+    ctx.fillText(`${label} · 배치 예시`, labelPosition[0], labelPosition[1] - 17);
+  }
+
+  function demoPosition(time) {
+    const path = [
+      [2.3, 3.6], [3.5, 3.5], [4.2, 2.8], [4.2, 1.7],
+      [3.3, 2.0], [2.6, 2.9], [2.3, 3.6]
+    ];
+    const progress = (Math.floor(time / 12) * 3 + Math.min(time % 12, 3)) * .4 % (path.length - 1);
+    const index = Math.floor(progress);
+    const part = progress - index;
+    return {
+      x: path[index][0] + (path[index + 1][0] - path[index][0]) * part,
+      z: path[index][1] + (path[index + 1][1] - path[index][1]) * part
+    };
+  }
+
+  function drawPerson(position, label, status, pose) {
+    const foot = project(position.x, position.z, 0);
+    const sitting = pose === "sitting";
+    const lying = pose === "lying";
+    const hip = lying ? [foot[0] - 5, foot[1]]
+      : [foot[0], foot[1] - (sitting ? 10 : 14)];
+    const head = lying ? [foot[0] + 33, foot[1] - 6]
+      : sitting ? [foot[0] + 6, foot[1] - 29]
+        : viewMode === "top" ? [foot[0], foot[1] - 31]
+          : project(position.x, position.z, .95);
+
+    const color = status === "emergency" ? "#c1232c"
+      : status === "warning" ? "#a87f00" : "#1751d0";
+
+    ctx.beginPath();
+    ctx.ellipse(foot[0], foot[1], 21, 9, 0, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(23,81,208,.1)";
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(head[0], head[1] - 5, 5.5, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    ctx.lineCap = "round";
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.moveTo(head[0] - (lying ? 9 : 0), head[1] + 6);
+    ctx.lineTo(...hip);
+    ctx.stroke();
+
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    const stride = pose === "walking" ? 9 : 5;
+    ctx.moveTo(...hip);
+    ctx.lineTo(foot[0] - (lying ? 25 : sitting ? -5 : stride), foot[1] - 2);
+    ctx.moveTo(...hip);
+    ctx.lineTo(foot[0] + (lying ? -25 : sitting ? 11 : stride), foot[1] + (lying ? 5 : -2));
+    ctx.moveTo(head[0] - (lying ? 13 : 0), head[1] + 10);
+    ctx.lineTo(head[0] - (lying ? 24 : 9), head[1] + (lying ? 12 : 20));
+    ctx.stroke();
+    ctx.lineCap = "butt";
+
+    ctx.font = "bold 10px Arial, 'Malgun Gothic', sans-serif";
+    ctx.fillStyle = "#1e2433";
+    ctx.textAlign = "center";
+    ctx.fillText(label, head[0], head[1] - 22);
+  }
+
+  function drawRoom() {
+    if (!roomWidth || !roomHeight) return;
+    ctx.clearRect(0, 0, roomWidth, roomHeight);
+
+    polygon([[0,0,0], [6,0,0], [6,5,0], [0,5,0]], "#eaf0f6");
+
+    if (viewMode === "iso") {
+      polygon([[0,0,0], [6,0,0], [6,0,2], [0,0,2]], "#e0e7f0");
+      polygon([[0,0,0], [0,5,0], [0,5,2], [0,0,2]], "#edf1f6");
+      polygon([[.65,0,.85], [2.15,0,.85], [2.15,0,1.6], [.65,0,1.6]], "#fafdff");
+      line([1.4,0,.85], [1.4,0,1.6], "#bdcbdc");
+      polygon([[4.8,0,0], [5.6,0,0], [5.6,0,1.6], [4.8,0,1.6]], "#d3deeb");
+    }
+
+    for (let x = 1; x < 6; x++) line([x,0,0], [x,5,0]);
+    for (let z = 1; z < 5; z++) line([0,z,0], [6,z,0]);
+
+    box(.35, 2.5, 1.5, 2, .32, "#cfdaea");
+    box(.42, 2.57, 1.36, 1.85, .44, "#f8fbff");
+    box(.56, 2.72, 1.08, .4, .5, "#dce7f5");
+    box(.43, 3.65, 1.34, .75, .5, "#bed0e9");
+    box(4.3, .5, 1.3, .65, .8, "#d0ddec");
+    box(4.65, 1.45, .5, .5, .4, "#c0d0e5");
+
+    drawSensor(.15, .2, "S1");
+    drawSensor(5.8, .2, "S2");
+    textAt("침실 예시", 1.05, 4.85);
+    textAt("생활 공간 예시", 4.6, 4.75);
+    textAt("6m", 3, 5.45);
+
+    const resident = current();
+    const frame = connected(resident) ? resident.frame : null;
+    const position = frame?.position || (!frame && demoPlaying ? demoPosition(demoTime) : null);
+    const trail = frame ? resident.trail : demoPlaying
+      ? Array.from({ length: 30 }, (_, i) =>
+          demoPosition(Math.max(0, demoTime - (29 - i) * .09)))
+      : [];
+
+    if (trail.length > 1) {
+      ctx.beginPath();
+      trail.forEach((point, index) => {
+        const p = project(point.x, point.z, .02);
+        index ? ctx.lineTo(...p) : ctx.moveTo(...p);
+      });
+      ctx.strokeStyle = "#1751d0";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([3, 5]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    if (position) {
+      const pose = frame?.pose ?? (!frame && demoPlaying ? demoPoses[Math.floor(demoTime / 3) % demoPoses.length] : null);
+      const label = [frame ? "센서 수신 위치" : "데모", poseLabels[pose]].filter(Boolean).join(" · ");
+      drawPerson(position, label, frame?.status, pose);
+    } else {
+      textAt("실제 위치 데이터 수신 대기", 3.4, 2.7);
+    }
+  }
+
+  function animate(timestamp) {
+    const delta = previousAnimationTime
+      ? Math.min((timestamp - previousAnimationTime) / 1000, .1) : 0;
+    previousAnimationTime = timestamp;
+    if (demoPlaying) {
+      demoTime += delta;
+      drawRoom();
+    }
+    requestAnimationFrame(animate);
+  }
+
+  /* ───────────────── 상세 정보 ───────────────── */
+
+  function metricTable(report) {
+    const before = report.previous_week;
+    const after = report.recent_week;
+    const rows = [
+      ["평균 호흡수", formatBreath(before.average_bpm), formatBreath(after.average_bpm)],
+      ["호흡수 유효 관측일", before.measured_days + "/7일", after.measured_days + "/7일"],
+      ["일평균 활동 시간", formatActivity(before), formatActivity(after)],
+      ["주의 로그", formatCount(before.warning_log_count), formatCount(after.warning_log_count)],
+      ["응급 로그", formatCount(before.emergency_log_count), formatCount(after.emergency_log_count)]
+    ];
+    return `<table>
+      <thead><tr><th>지표</th><th>그 이전 주</th><th>직전 주</th></tr></thead>
+      <tbody>${rows.map(row => "<tr>" + row.map(value => "<td>" + value + "</td>").join("") + "</tr>").join("")}</tbody>
+    </table>`;
+  }
+
+  function breathDetail(report) {
+    return `<h3>14일 날짜별 평균 호흡수</h3>
+      <p>${weekRange(report.previous_week)} / ${weekRange(report.recent_week)} · 회/분</p>
+      ${breathingTrend(report.daily)}
+      <p>주간 평균 변화 ${difference(report.comparison.average_change_bpm)}</p>
+      <details><summary>날짜별 수치 보기</summary><table>
+        <thead><tr><th>날짜</th><th>평균 호흡수</th><th>유효 관측</th></tr></thead>
+        <tbody>${report.daily.map(day => `<tr><td>${escapeHTML(day.date)}</td>
+          <td>${formatBreath(day.average_bpm)}</td><td>${day.valid_count}/${day.record_count}건</td></tr>`).join("")}</tbody>
+      </table></details>`;
+  }
+
+  function distributionDetail(report) {
+    const before = report.previous_week.warning_logs_by_time;
+    const after = report.recent_week.warning_logs_by_time;
+    return `<h3>시간대별 주의 로그</h3><table>
+      <thead><tr><th>시간대 (한국 시간)</th><th>그 이전 주</th><th>직전 주</th></tr></thead>
+      <tbody>${timeBuckets.map(([key, label, time]) =>
+        `<tr><td>${label} ${time}</td><td>${formatCount(before[key])}</td><td>${formatCount(after[key])}</td></tr>`).join("")}</tbody>
+    </table><p>로그 한 줄을 한 건으로 셉니다. 한 사건이 여러 번 기록될 수 있습니다.</p>`;
+  }
+
+  function buildDetail(type) {
+    const report = current().report;
+    if (type === "guide") return `
+      <h3>공간 모니터링</h3>
+      <p>6 × 5m 예시 방입니다. 3D와 평면을 전환할 수 있습니다.
+         움직임 데모로 걷기·서기·앉기·눕기를 볼 수 있습니다.</p>
+      <p>실제 좌표를 표시하려면 방과 센서의 좌표계를 보정한 뒤 수신 모듈을 연결해야 합니다.</p>`;
+
+    if (type === "data") return `
+      <h3>데이터 출처</h3>
+      <table><tbody>
+        <tr><th>14일 호흡수</th><td>DB의 정오 관측 시연 데이터</td></tr>
+        <tr><th>일평균 활동</th><td>저장된 요약의 활동 시간 합계 ÷ 활동 기록이 있는 날짜 수</td></tr>
+        <tr><th>주의·응급 로그</th><td>DB 수신 로그의 한국 시간 기준 집계</td></tr>
+        <tr><th>현재 위치와 자세</th><td>센서 입력 대기 · 움직임 데모의 좌표와 자세는 가상 값</td></tr>
+      </tbody></table>`;
+
+    if (!report) return '<div class="empty">대상자와 비교 날짜를 선택하고 주간 데이터를 불러와 주세요.</div>';
+
+    if (type === "events") {
+      const logs = report.event_logs;
+      if (!logs.length) return '<div class="empty">이 대상자에게 저장된 이벤트 로그가 없습니다.</div>';
+      return `<p>비교 기간과 관계없이 최근 수신 로그를 최대 50건 표시합니다.</p>
+        <table><thead><tr><th>기록 시각</th><th>상태</th><th>유형</th><th>지속 시간</th></tr></thead>
+        <tbody>${logs.map(log => `<tr>
+          <td>${escapeHTML(formatEventTime(log.logged_at))}</td>
+          <td>${escapeHTML(log.status_level)}</td>
+          <td>${escapeHTML(log.event_type)}</td>
+          <td>${isNumber(log.duration_sec) ? log.duration_sec + "초" : "—"}</td>
+        </tr>`).join("")}</tbody></table>`;
+    }
+    if (type === "breath") return breathDetail(report);
+    if (type === "distribution") return distributionDetail(report);
+    if (type === "metrics" || type === "findings") return metricTable(report);
+    return metricTable(report) + breathDetail(report) + distributionDetail(report);
+  }
+
+  async function readJSON(url) {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    return response.json();
+  }
+
+  async function loadReport() {
+    const request = ++requestNumber;
+    const resident = current();
+    const value = $("reportDate").value;
+    const date = new Date(value + "T00:00:00Z");
+    $("reportDate").setCustomValidity("");
+    if (!resident.id) return;
+    resident.report = null;
+    renderDashboard();
+    if (!value || date.getUTCDay() !== 1) {
+      $("reportDate").setCustomValidity("비교 기준일은 월요일을 선택하세요.");
+      $("reportDate").reportValidity();
+      $("loadStatus").textContent = "비교 기준일은 월요일을 선택하세요.";
+      return;
+    }
+    $("loadStatus").textContent = "DB에서 주간 데이터 조회 중";
+    const query = new URLSearchParams({ subject_id: resident.id, report_date: value });
+    try {
+      const report = await readJSON("/api/v1/care-report?" + query);
+      if (request !== requestNumber) return;
+      resident.report = report;
+      $("loadStatus").textContent = "DB 조회 완료 · 호흡수는 시연 데이터";
+    } catch {
+      if (request !== requestNumber) return;
+      $("loadStatus").textContent = "주간 데이터를 불러오지 못했습니다. 서버와 DB를 확인하세요.";
+    }
+    renderDashboard();
+  }
+
+  async function loadSubjects() {
+    try {
+      const subjects = await readJSON("/api/v1/care-subjects");
+      for (const subject of subjects) {
+        residents.push({ id: subject.subject_id, name: subject.display_name, frame: null,
+          report: null, lastReceived: 0, trail: [] });
+      }
+      $("subjectCount").textContent = residents.length;
+      $("subjectBadge").textContent = residents.length + "명";
+      if (residents.length) {
+        await loadReport();
+      } else {
+        $("loadStatus").textContent = "DB에 등록된 대상자가 없습니다.";
+      }
+    } catch {
+      $("loadStatus").textContent = "대상자 목록을 불러오지 못했습니다. 서버와 DB를 확인하세요.";
+    }
+  }
+
+  function openModal(type) {
+    previousFocus = document.activeElement;
+    const titles = {
+      report: "주간 돌봄 리포트",
+      breath: "주간 평균 호흡수",
+      metrics: "핵심 주간 지표",
+      distribution: "시간대별 주의 이벤트",
+      findings: "두 주의 지표 비교",
+      events: "이벤트 로그 이력",
+      guide: "공간·센서 연동 안내",
+      data: "데이터 출처 및 관리"
+    };
+
+    $("modalTitle").textContent = titles[type] || "상세 정보";
+    $("modalSubtitle").textContent = `${current().name} · ${current().id}` +
+      (current().report ? ` · ${weekRange(current().report.recent_week)}` : "");
+    $("modalBody").innerHTML = buildDetail(type);
+    $("modalBody").scrollTop = 0;
+    $("modalBackdrop").classList.add("open");
+    $("modalBackdrop").setAttribute("aria-hidden", "false");
+    $("closeModal").focus();
+  }
+
+  function closeModal() {
+    $("modalBackdrop").classList.remove("open");
+    $("modalBackdrop").setAttribute("aria-hidden", "true");
+    previousFocus?.focus();
+  }
+
+  /* ───────────────── 실제 센서 연결 지점 ─────────────────
+     움직임 데모는 이 인터페이스를 호출하지 않습니다.
+     입력 상태는 센서/서버의 판정을 사용하며 화면이 의학적 판정을 하지 않습니다.
+  */
+  window.CareMonitor = {
+    ingestFrame(frame) {
+      if (!frame || typeof frame !== "object") {
+        return { ok: false, error: "프레임 객체가 필요합니다." };
+      }
+
+      const resident = residents.find(item => item.id === String(frame.resident_id));
+      if (!resident) return { ok: false, error: "등록되지 않은 대상자입니다." };
+
+      const timestamp = typeof frame.timestamp === "string"
+        ? Date.parse(frame.timestamp) : NaN;
+
+      if (!Number.isFinite(timestamp) || Math.abs(Date.now() - timestamp) > 30000) {
+        return { ok: false, error: "현재 시각 ±30초 이내의 timestamp가 필요합니다." };
+      }
+
+      if (resident.frame && timestamp <= Date.parse(resident.frame.timestamp)) {
+        return { ok: false, error: "중복 또는 이전 프레임입니다." };
+      }
+
+      const position = frame.position ?? null;
+      if (position !== null && (
+        !isNumber(position.x) || !isNumber(position.z) ||
+        position.x < 0 || position.x > 6 ||
+        position.z < 0 || position.z > 5
+      )) {
+        return { ok: false, error: "위치 범위: x 0–6m, z 0–5m." };
+      }
+
+      const breath = frame.breath_rate_bpm ?? null;
+      if (breath !== null && (!isNumber(breath) || breath < 0)) {
+        return { ok: false, error: "호흡수는 0 이상 숫자 또는 null이어야 합니다." };
+      }
+
+      const status = frame.status ?? "unknown";
+      if (!["normal", "warning", "emergency", "unknown"].includes(status)) {
+        return { ok: false, error: "지원하지 않는 상태 값입니다." };
+      }
+
+      const pose = frame.pose ?? null;
+      if (pose !== null && !Object.hasOwn(poseLabels, pose)) {
+        return { ok: false, error: "지원하지 않는 자세입니다." };
+      }
+
+      if (!connected(resident)) resident.trail = [];
+
+      resident.frame = {
+        timestamp: frame.timestamp,
+        position: position ? { x: position.x, z: position.z } : null,
+        breath_rate_bpm: breath,
+        status,
+        pose
+      };
+      resident.lastReceived = Date.now();
+
+      if (position) {
+        resident.trail.push({ x: position.x, z: position.z });
+        resident.trail = resident.trail.slice(-100);
+      } else {
+        resident.trail = [];
+      }
+
+      if (resident === current()) {
+        demoPlaying = false;
+        renderLive();
+        drawRoom();
+      }
+      renderResidents();
+      return { ok: true };
+    },
+
+    disconnect(residentId) {
+      const resident = residents.find(item => item.id === String(residentId));
+      if (!resident) return { ok: false, error: "대상자를 찾을 수 없습니다." };
+
+      resident.frame = null;
+      resident.lastReceived = 0;
+      resident.trail = [];
+      renderResidents();
+      renderLive();
+      drawRoom();
+      return { ok: true };
+    }
+  };
+
+  /* ───────────────── 화면 조작 ───────────────── */
+
+  $("search").addEventListener("input", renderResidents);
+
+  $("residentList").addEventListener("click", event => {
+    const button = event.target.closest("[data-person]");
+    if (!button) return;
+    selectedIndex = Number(button.dataset.person);
+    demoPlaying = false;
+    demoTime = 0;
+    void loadReport();
+  });
+  $("reportDate").addEventListener("change", loadReport);
+  $("refreshReport").addEventListener("click", () => {
+    if (current().id) void loadReport();
+    else location.reload();
+  });
+
+  function setFilter(value) {
+    filter = value;
+    renderResidents();
+  }
+
+  document.querySelectorAll("[data-filter]").forEach(button =>
+    button.addEventListener("click", () => setFilter(button.dataset.filter)));
+
+  $("summaryAll").addEventListener("click", () => setFilter("all"));
+  $("summaryPriority").addEventListener("click", () => setFilter("priority"));
+
+  function setView(mode) {
+    viewMode = mode;
+    $("isoButton").classList.toggle("active", mode === "iso");
+    $("topButton").classList.toggle("active", mode === "top");
+    $("isoButton").setAttribute("aria-pressed", String(mode === "iso"));
+    $("topButton").setAttribute("aria-pressed", String(mode === "top"));
+    drawRoom();
+  }
+
+  $("isoButton").addEventListener("click", () => setView("iso"));
+  $("topButton").addEventListener("click", () => setView("top"));
+  $("resetButton").addEventListener("click", () => {
+    demoTime = 0;
+    setView("iso");
+  });
+
+  $("demoButton").addEventListener("click", () => {
+    if (connected(current())) return;
+    demoPlaying = !demoPlaying;
+    if (demoPlaying) demoTime = 0;
+    renderLive();
+    drawRoom();
+  });
+
+  document.querySelectorAll("[data-detail]").forEach(button =>
+    button.addEventListener("click", () => openModal(button.dataset.detail)));
+
+  $("closeModal").addEventListener("click", closeModal);
+  $("closeModalBottom").addEventListener("click", closeModal);
+
+  $("modalBackdrop").addEventListener("click", event => {
+    if (event.target === $("modalBackdrop")) closeModal();
+  });
+
+  document.addEventListener("keydown", event => {
+    if (!$("modalBackdrop").classList.contains("open")) return;
+    if (event.key === "Escape") closeModal();
+
+    if (event.key === "Tab") {
+      const controls = [...$("modalBackdrop").querySelectorAll(
+        'button, a[href], input, select, textarea, [tabindex="0"]'
+      )].filter(element => !element.disabled && element.offsetParent !== null);
+
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    }
+  });
+
+  window.addEventListener("resize", fitScreen);
+
+  if (window.ResizeObserver) {
+    new ResizeObserver(resizeRoom).observe($("canvasWrap"));
+  } else {
+    window.addEventListener("resize", resizeRoom);
+  }
+
+  setInterval(() => {
+    const count = residents.filter(connected).length;
+    if (String(count) === $("connectedCount").textContent) return;
+    renderResidents();
+    renderLive();
+    if (!demoPlaying) drawRoom();
+  }, 1000);
+
+  fitScreen();
+  renderDashboard();
+  resizeRoom();
+  requestAnimationFrame(animate);
+  void loadSubjects();
+})();
+</script>
+</body>
+</html>

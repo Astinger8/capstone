@@ -1,0 +1,1796 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>온결 | 독거노인 통합 돌봄 모니터링</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+
+  <style>
+    :root {
+      --primary: #1751d0;
+      --text: #1e2433;
+      --muted: #505a74;
+      --border: #e2e6f0;
+      --background: #f3f5f9;
+      --surface: #fdfdff;
+      --warning: #a87f00;
+      --serious: #c24e00;
+      --danger: #c1232c;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #e8edf4;
+      color: var(--text);
+      font-family: Arial, "Malgun Gothic", sans-serif;
+    }
+
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+
+    button:focus-visible, input:focus-visible {
+      outline: 3px solid #1751d0;
+      outline-offset: 3px;
+    }
+
+    button {
+      color: inherit;
+      border: 0;
+      background: none;
+    }
+
+    /* 화면 전체를 창 크기에 맞춰 축소하므로 페이지 스크롤이 생기지 않습니다. */
+    #app {
+      position: absolute;
+      width: 1440px;
+      height: 880px;
+      display: grid;
+      grid-template-rows: 70px 92px minmax(0, 1fr) 30px;
+      overflow: hidden;
+      transform-origin: top left;
+      background: var(--background);
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      padding: 0 24px;
+      background: white;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 25px;
+      font-weight: 800;
+    }
+
+    .brand-icon {
+      display: grid;
+      place-items: center;
+      width: 35px;
+      height: 35px;
+      border-radius: 11px;
+      background: var(--primary);
+      color: white;
+    }
+
+    .brand small {
+      display: block;
+      margin-top: 1px;
+      color: var(--muted);
+      font-size: 9px;
+      letter-spacing: 2px;
+    }
+
+    .divider {
+      width: 1px;
+      height: 27px;
+      margin: 0 7px;
+      background: var(--border);
+    }
+
+    h1 { margin: 0; font-size: 18px; }
+    .spacer { flex: 1; }
+    .muted { color: var(--muted); }
+    .small { font-size: 11px; line-height: 1.7; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: white;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .btn:hover { background: #edf3ff; }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+
+    .btn.primary {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+
+    .link {
+      padding: 0;
+      color: #1241a6;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 7px;
+      border-radius: 5px;
+      background: #edf1f6;
+      font-size: 10px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .badge::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #818ba0;
+    }
+
+    .badge.blue { background: #eaf0fd; }
+    .badge.blue::before { background: var(--primary); }
+    .badge.orange { background: #fff0e6; }
+    .badge.orange::before { background: var(--serious); }
+    .badge[data-status="normal"]::before { background: #1aa612; }
+    .badge[data-status="warning"]::before { background: var(--warning); }
+    .badge[data-status="emergency"]::before { background: var(--danger); }
+
+    .overview {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1.55fr;
+      gap: 12px;
+      padding: 14px 22px;
+    }
+
+    .overview-card {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      padding: 10px 15px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: white;
+      text-align: left;
+    }
+
+    .overview-icon {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: #edf3ff;
+      color: var(--primary);
+      font-size: 19px;
+    }
+
+    .overview-card strong {
+      margin-left: auto;
+      font-size: 28px;
+    }
+
+    .overview-label { font-size: 12px; font-weight: 700; }
+    .overview-note { margin-top: 4px; font-size: 10px; color: var(--muted); }
+
+    .data-note {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-left: 7px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.7;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: 224px minmax(0, 1fr) 286px;
+      gap: 13px;
+      min-height: 0;
+      padding: 0 22px 12px;
+    }
+
+    .panel {
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      background: var(--surface);
+    }
+
+    .title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin: 0;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .sidebar { display: flex; flex-direction: column; padding: 16px 12px; }
+
+    .search {
+      width: 100%;
+      margin: 14px 0 10px;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: #f8fafc;
+      font-size: 12px;
+    }
+
+    .filters { display: flex; gap: 5px; margin-bottom: 12px; }
+
+    .filter {
+      padding: 6px 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 10px;
+    }
+
+    .filter.active {
+      background: #eaf0fd;
+      border-color: #b9cdf3;
+      color: #1241a6;
+    }
+
+    .resident-list { display: flex; flex-direction: column; gap: 8px; }
+
+    .resident {
+      width: 100%;
+      padding: 12px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: white;
+      text-align: left;
+    }
+
+    .resident:hover { background: #f5f8ff; }
+
+    .resident.selected {
+      background: #edf3ff;
+      border-color: #8faeea;
+      box-shadow: inset 3px 0 var(--primary);
+    }
+
+    .resident-top { display: flex; align-items: center; gap: 9px; }
+
+    .avatar {
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: #e5ecf7;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .resident-name { font-size: 13px; font-weight: 700; }
+    .resident-id { margin-top: 4px; color: var(--muted); font-size: 10px; }
+    .resident-status { margin-top: 10px; font-size: 10px; color: var(--muted); }
+
+    .sidebar-foot {
+      margin-top: auto;
+      padding-top: 13px;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.8;
+    }
+
+    .center {
+      display: grid;
+      grid-template-rows: 54px minmax(0, 1fr) 190px;
+      gap: 12px;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .person-header { display: flex; align-items: center; gap: 11px; }
+    .person-header .avatar { width: 43px; height: 43px; }
+    .person-header h2 { margin: 0; font-size: 21px; }
+    .person-header p { margin: 5px 0 0; font-size: 10px; color: var(--muted); }
+
+    .space-panel { display: flex; flex-direction: column; background: #f8fafc; }
+
+    .space-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 13px 15px;
+      background: white;
+    }
+
+    .view-controls { display: flex; gap: 5px; margin-left: auto; }
+    .view-controls .btn { padding: 5px 8px; font-size: 10px; }
+    .view-controls .active { background: #eaf0fd; border-color: #b9cdf3; }
+
+    .canvas-wrap { position: relative; flex: 1; min-height: 0; }
+    #roomCanvas { display: block; width: 100%; height: 100%; }
+
+    .space-note {
+      position: absolute;
+      top: 8px;
+      left: 15px;
+      pointer-events: none;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.7;
+    }
+
+    .space-legend {
+      position: absolute;
+      top: 8px;
+      right: 13px;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.8;
+      pointer-events: none;
+    }
+
+    .space-footer {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 15px;
+      border-top: 1px solid var(--border);
+      background: white;
+    }
+
+    .space-footer .btn { font-size: 10px; padding: 7px 9px; }
+
+    .bottom-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      min-height: 0;
+    }
+
+    .metric-card { display: flex; flex-direction: column; gap: 8px; padding: 13px; }
+    .metric-number { font-size: 25px; font-weight: 700; }
+    .metric-number small { font-size: 10px; font-weight: 400; color: var(--muted); }
+    .chart-wrap { position: relative; flex: 1; min-height: 0; }
+
+    .metric-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 11px;
+    }
+
+    .right {
+      display: grid;
+      grid-template-rows: 180px 174px minmax(0, 1fr);
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .state-panel, .priority-panel, .events-panel { padding: 16px; }
+    .state-main { margin: 17px 0 15px; font-size: 25px; font-weight: 700; }
+
+    .state-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    .state-grid > div {
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .state-grid strong { display: block; margin-top: 6px; color: var(--text); font-size: 14px; }
+
+    .priority-panel {
+      background: #fffaf5;
+      border-top: 3px solid var(--serious);
+    }
+
+    .priority-main { margin: 14px 0 9px; font-size: 21px; font-weight: 700; }
+
+    .events-panel { display: flex; flex-direction: column; }
+    .event-list { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; }
+    .event { padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 11px; }
+    .event span { display: block; margin-top: 5px; color: var(--muted); font-size: 10px; }
+
+    .empty {
+      display: grid;
+      place-content: center;
+      min-height: 110px;
+      color: var(--muted);
+      text-align: center;
+      font-size: 11px;
+      line-height: 1.9;
+    }
+
+    .events-foot {
+      margin-top: auto;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.7;
+    }
+
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 24px 7px;
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .modal-backdrop {
+      position: absolute;
+      inset: 0;
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 35px;
+      background: rgba(30, 36, 51, .46);
+    }
+
+    .modal-backdrop.open { display: flex; }
+
+    .modal {
+      display: flex;
+      flex-direction: column;
+      width: 900px;
+      max-height: 790px;
+      overflow: hidden;
+      border-radius: 13px;
+      background: white;
+      box-shadow: 0 25px 80px #0003;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      padding: 20px 25px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .modal-header h2 { margin: 0; font-size: 20px; }
+    .modal-header p { margin: 6px 0 0; color: var(--muted); font-size: 11px; }
+    .close-button { margin-left: auto; padding: 3px 9px; font-size: 26px; }
+
+    .modal-body {
+      min-height: 150px;
+      overflow: auto;
+      padding: 22px 25px;
+      font-size: 13px;
+      line-height: 1.8;
+    }
+
+    .modal-body h3 { margin: 20px 0 10px; font-size: 15px; }
+    .modal-body h3:first-child { margin-top: 0; }
+    .modal-body p { color: var(--muted); }
+
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      padding: 13px 25px;
+      border-top: 1px solid var(--border);
+      background: #fafbfd;
+    }
+
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { padding: 11px 9px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { background: #f3f5f9; color: var(--muted); }
+
+    .notice {
+      margin-bottom: 14px;
+      padding: 13px 15px;
+      border: 1px solid #dce5f6;
+      border-radius: 8px;
+      background: #f0f5ff;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .notice.warning { background: #fff8ef; border-color: #efdfc9; }
+
+    pre {
+      overflow: auto;
+      padding: 16px;
+      border-radius: 8px;
+      background: #1e2433;
+      color: #f7f9fc;
+      font-size: 11px;
+      line-height: 1.8;
+    }
+  </style>
+</head>
+
+<body>
+<div id="app">
+  <header class="header">
+    <div class="brand">
+      <span class="brand-icon" aria-hidden="true">∿</span>
+      <div>온결<small>CARE MONITOR</small></div>
+    </div>
+    <div class="divider"></div>
+    <h1>통합 돌봄 모니터링</h1>
+    <span class="badge blue">UI 프로토타입</span>
+    <span class="spacer"></span>
+    <span class="small muted">한 명의 사회복지사를 위한 다중 대상자 관찰 화면</span>
+    <button class="btn" data-detail="guide">공간·센서 연동 안내</button>
+    <div class="avatar" title="담당 사회복지사">담당</div>
+  </header>
+
+  <section class="overview" aria-label="전체 대상자 현황">
+    <button class="overview-card" id="summaryAll">
+      <span class="overview-icon">◫</span>
+      <div>
+        <div class="overview-label">담당 대상자</div>
+        <div class="overview-note">PostgreSQL 등록 대상자</div>
+      </div>
+      <strong id="subjectCount">—</strong>
+    </button>
+
+    <button class="overview-card" id="summaryPriority">
+      <span class="overview-icon" style="background:#fff0e6;color:#c24e00;">!</span>
+      <div>
+        <div class="overview-label">우선 확인</div>
+        <div class="overview-note">주간 리포트 기준</div>
+      </div>
+      <strong id="priorityCount">0</strong>
+    </button>
+
+    <div class="overview-card">
+      <span class="overview-icon">⌁</span>
+      <div>
+        <div class="overview-label">실시간 연결</div>
+        <div class="overview-note">최근 30초 이내 수신</div>
+      </div>
+      <strong id="connectedCount">0</strong>
+    </div>
+
+    <div class="data-note">
+      <span class="badge">데이터 구분</span>
+      <div>
+        <span id="dbStatus" role="status">DB에서 대상자 목록을 불러오는 중</span><br>
+        공간·가구·센서 배치와 대상자 02–05는 예시입니다.
+      </div>
+    </div>
+  </section>
+
+  <main class="workspace">
+    <aside class="panel sidebar">
+      <h2 class="title">담당 대상자 <span class="badge" id="subjectBadge">—</span></h2>
+      <input id="search" class="search" type="search"
+             placeholder="대상자 또는 관리번호 검색" aria-label="대상자 검색">
+
+      <div class="filters" aria-label="대상자 필터">
+        <button class="filter active" data-filter="all" aria-pressed="true">전체</button>
+        <button class="filter" data-filter="priority" aria-pressed="false">우선 확인</button>
+        <button class="filter" data-filter="offline" aria-pressed="false">미연결</button>
+      </div>
+
+      <nav id="residentList" class="resident-list" aria-label="대상자 선택"></nav>
+
+      <div class="sidebar-foot">
+        <b>대상자를 선택해 상세 상태를 확인하세요.</b><br>
+        대상자별 주간 지표와 이력을 DB에서 조회합니다.<br><br>
+        미연결을 정상 상태로 판단하지 않습니다.<br>
+        <span id="listCount">대상자 조회 대기</span>
+      </div>
+    </aside>
+
+    <section class="center">
+      <div class="person-header">
+        <div id="selectedAvatar" class="avatar">01</div>
+        <div>
+          <h2 id="selectedName">대상자 조회 대기</h2>
+          <p id="selectedMeta">DB 조회 대기</p>
+        </div>
+        <span class="spacer"></span>
+        <button class="btn" data-detail="report">주간 리포트 ↗</button>
+      </div>
+
+      <article class="panel space-panel">
+        <header class="space-header">
+          <h3 class="title">공간 모니터링</h3>
+          <span id="spaceBadge" class="badge">공간 예시 · 미연결</span>
+          <div class="view-controls">
+            <button id="isoButton" class="btn active" aria-pressed="true">3D</button>
+            <button id="topButton" class="btn" aria-pressed="false">평면</button>
+            <button id="resetButton" class="btn" aria-label="공간 시점 초기화">↺</button>
+          </div>
+        </header>
+
+        <div id="canvasWrap" class="canvas-wrap">
+          <canvas id="roomCanvas" role="img"
+                  aria-label="예시 주거 공간. 실제 위치 데이터 수신 대기."></canvas>
+          <div class="space-note">
+            예시 공간 6 × 5m<br>
+            실제 평면·감지 범위가 아닙니다.
+          </div>
+          <div class="space-legend">
+            <span style="color:#1751d0;">●</span> 센서 배치 예시<br>
+            <span id="positionLegend">○ 실제 위치 데이터 없음</span>
+          </div>
+        </div>
+
+        <footer class="space-footer">
+          <span id="spaceStatus" class="small muted">실제 움직임 데이터 수신 대기</span>
+          <span class="spacer"></span>
+          <button id="demoButton" class="btn">▷ 움직임 데모</button>
+          <button class="link" data-detail="guide">연동 안내 ↗</button>
+        </footer>
+      </article>
+
+      <section class="bottom-grid">
+        <article class="panel metric-card">
+          <h3 class="title">
+            주간 평균 호흡수
+            <button class="link" data-detail="breath">상세 ↗</button>
+          </h3>
+          <div class="metric-number"><span id="breathValue">—</span> <small>회/분</small></div>
+          <div class="chart-wrap"><canvas id="breathChart" role="img"></canvas></div>
+          <div id="breathNote" class="small muted"></div>
+        </article>
+
+        <article class="panel metric-card">
+          <h3 class="title">
+            핵심 주간 지표
+            <button class="link" data-detail="metrics">상세 ↗</button>
+          </h3>
+          <div id="metricSummary"></div>
+          <div class="small muted" style="margin-top:auto;">현재 상태가 아닌 주간 집계입니다.</div>
+        </article>
+
+        <article class="panel metric-card">
+          <h3 class="title">
+            주의 이벤트 시간대
+            <button class="link" data-detail="distribution">상세 ↗</button>
+          </h3>
+          <div class="metric-number"><span id="warningValue">—</span> <small>건 · 이번 주</small></div>
+          <div class="chart-wrap"><canvas id="warningChart" role="img"></canvas></div>
+          <div id="warningNote" class="small muted"></div>
+        </article>
+      </section>
+    </section>
+
+    <aside class="right">
+      <article class="panel state-panel">
+        <h2 class="title">현재 사용자 상태 <span id="liveBadge" class="badge">미연결</span></h2>
+        <div id="currentState" class="state-main">확인 대기</div>
+        <div class="state-grid">
+          <div>현재 호흡수<strong id="liveBreath">—</strong></div>
+          <div>현재 위치<strong id="livePosition">수신 대기</strong></div>
+        </div>
+        <div id="lastReceived" class="small muted" style="margin-top:9px;">실시간 센서 데이터 없음</div>
+      </article>
+
+      <article class="panel priority-panel">
+        <h2 class="title">돌봄 우선순위 <span class="badge orange">주간 기준</span></h2>
+        <div id="priorityText" class="priority-main">평가 데이터 없음</div>
+        <div id="priorityDescription" class="small muted"></div>
+        <button class="link" data-detail="findings" style="margin-top:11px;">권고 근거 확인 ↗</button>
+      </article>
+
+      <article class="panel events-panel">
+        <h2 class="title">
+          최근 이벤트
+          <button class="link" data-detail="events">전체 이력 ↗</button>
+        </h2>
+        <div id="eventList" class="event-list"></div>
+        <div class="events-foot">
+          주간 합계와 개별 발생 이력은 별도입니다.<br>
+          데모 움직임은 이벤트에 기록하지 않습니다.<br>
+          <button class="link" data-detail="findings" style="margin-top:8px;">주간 분석 소견 ↗</button>
+        </div>
+      </article>
+    </aside>
+  </main>
+
+  <footer class="footer">
+    <span id="reportTimestamp"></span>
+    <span>의료 진단이 아닌 보조 참고 정보 · <button class="link" data-detail="data">데이터 관리</button></span>
+  </footer>
+
+  <div id="modalBackdrop" class="modal-backdrop" aria-hidden="true">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <header class="modal-header">
+        <div>
+          <h2 id="modalTitle">상세 정보</h2>
+          <p id="modalSubtitle"></p>
+        </div>
+        <button id="closeModal" class="close-button" aria-label="상세 창 닫기">×</button>
+      </header>
+      <div id="modalBody" class="modal-body"></div>
+      <footer class="modal-footer">
+        <button id="closeModalBottom" class="btn">닫기</button>
+      </footer>
+    </section>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const $ = id => document.getElementById(id);
+  const residents = [];
+  const emptyResident = { id: "—", name: "대상자 조회 대기", report: null, events: [] };
+  const reportDate = "2026-11-09";
+  const reportNotes = {
+    "[시연] 안정 추이": "안정 추이 시연",
+    "[시연] 새벽 주의 증가": "새벽 주의 기록 확인",
+    "[시연] 낙상 의심 이력": "과거 낙상 의심 기록 확인",
+    "[시연] 일부 측정 누락": "측정 누락 확인"
+  };
+  let reportRequest = 0;
+
+  const metricDefinitions = [
+    ["breath_rate_bpm", "평균 호흡수", "회/분"],
+    ["total_active_hours", "총 활동 시간", "시간"],
+    ["warning_event_count", "주의 이벤트", "건"],
+    ["emergency_event_count", "응급 이벤트", "건"]
+  ];
+
+  let selectedIndex = 0;
+  let filter = "all";
+  let viewMode = "iso";
+  let demoPlaying = false;
+  let demoTime = 0;
+  let previousAnimationTime = 0;
+  let previousFocus = null;
+  let activeDetail = null;
+  let breathChart = null;
+  let warningChart = null;
+  let roomWidth = 0;
+  let roomHeight = 0;
+
+  const roomCanvas = $("roomCanvas");
+  const ctx = roomCanvas.getContext("2d");
+  const current = () => residents[selectedIndex] ?? emptyResident;
+
+  const isNumber = value =>
+    typeof value === "number" && Number.isFinite(value);
+
+  const valueText = value => isNumber(value) ? String(value) : "—";
+
+  const changeText = value =>
+    isNumber(value) ? `${value > 0 ? "+" : ""}${value}%` : "미제공";
+
+  const escapeHTML = value =>
+    String(value ?? "").replace(/[&<>"']/g, char => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;",
+      '"': "&quot;", "'": "&#39;"
+    }[char]));
+
+  const connected = resident =>
+    Boolean(resident.frame && Date.now() - resident.lastReceived < 30000);
+
+  const highPriority = resident =>
+    /^HIGH\b/i.test(resident.report?.care_priority || "");
+
+  /* 전체 레이아웃을 화면에 맞춤: 본문 스크롤 없음. */
+  function fitScreen() {
+    const scale = Math.min(window.innerWidth / 1440, window.innerHeight / 880);
+    $("app").style.transform = `scale(${scale})`;
+    $("app").style.left = `${(window.innerWidth - 1440 * scale) / 2}px`;
+    $("app").style.top = `${(window.innerHeight - 880 * scale) / 2}px`;
+  }
+
+  function renderResidents() {
+    const query = $("search").value.trim().toLowerCase();
+
+    const visible = residents.map((resident, index) => ({ resident, index }))
+      .filter(({ resident }) =>
+        `${resident.name} ${resident.id}`.toLowerCase().includes(query) &&
+        (
+          filter === "all" ||
+          (filter === "priority" && highPriority(resident)) ||
+          (filter === "offline" && !connected(resident))
+        )
+      );
+
+    $("residentList").innerHTML = visible.map(({ resident, index }) => {
+      const status = highPriority(resident)
+        ? "우선 확인 · 주간 리포트 기준"
+        : connected(resident)
+          ? "실시간 센서 수신 중"
+          : resident.report
+            ? "주간 리포트 연결 · 센서 미연결"
+            : "주간 리포트 조회 대기 · 센서 미연결";
+
+      return `
+        <button class="resident ${index === selectedIndex ? "selected" : ""}"
+                data-person="${index}" aria-pressed="${index === selectedIndex}">
+          <div class="resident-top">
+            <div class="avatar">${String(index + 1).padStart(2, "0")}</div>
+            <div>
+              <div class="resident-name">${escapeHTML(resident.name)}</div>
+              <div class="resident-id">${resident.id}</div>
+            </div>
+          </div>
+          <div class="resident-status">${status}</div>
+        </button>`;
+    }).join("") || '<div class="empty">검색 결과가 없습니다.</div>';
+
+    $("listCount").textContent = `표시 ${visible.length} / 전체 ${residents.length}`;
+    $("priorityCount").textContent = residents.filter(highPriority).length;
+    $("connectedCount").textContent = residents.filter(connected).length;
+
+    document.querySelectorAll("[data-filter]").forEach(button => {
+      const active = button.dataset.filter === filter;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", String(active));
+    });
+  }
+
+  function renderDashboard() {
+    const resident = current();
+    const report = resident.report;
+    const metrics = report?.comparison_metrics;
+    const distribution = report?.time_of_day_warning_distribution;
+
+    $("selectedAvatar").textContent = resident.subjectId ? String(selectedIndex + 1).padStart(2, "0") : "—";
+    $("selectedName").textContent = resident.name;
+    $("selectedMeta").textContent =
+      `${resident.id} · ${report ? "주간 리포트 연결" : "주간 리포트 조회 대기"}`;
+
+    $("breathValue").textContent = valueText(metrics?.breath_rate_bpm?.curr_7d);
+    $("warningValue").textContent = valueText(metrics?.warning_event_count?.curr_7d);
+
+    $("breathNote").textContent = metrics
+      ? `전주 ${valueText(metrics.breath_rate_bpm.prev_7d)} → 이번 주 ${valueText(metrics.breath_rate_bpm.curr_7d)} · ${changeText(metrics.breath_rate_bpm.change_pct)}`
+      : "주간 리포트 미연결";
+
+    $("warningNote").textContent = distribution
+      ? `새벽 ${distribution.dawn_00_06} · 낮 ${distribution.day_06_18} · 밤 ${distribution.night_18_24}건`
+      : "시간대별 데이터 없음";
+
+    $("metricSummary").innerHTML = metrics
+      ? [
+          ["활동 시간", `${valueText(metrics.total_active_hours.curr_7d)}시간`],
+          ["주의 이벤트", `${metrics.warning_event_count.curr_7d}건`],
+          ["응급 이벤트", `${metrics.emergency_event_count.curr_7d}건`]
+        ].map(([label, value]) =>
+          `<div class="metric-row"><span>${label}</span><strong>${value}</strong></div>`
+        ).join("")
+      : '<div class="empty">주간 지표가 없습니다.</div>';
+
+    $("priorityText").textContent = report
+      ? highPriority(resident) ? "우선 방문 권고" : report.care_priority
+      : "평가 데이터 없음";
+
+    $("priorityDescription").textContent = report
+      ? "주간 리포트의 참고 표시입니다. 현재 상태는 위에서 확인하세요."
+      : "미연결을 정상으로 판단하지 않습니다. 주간 리포트 연결이 필요합니다.";
+
+    $("reportTimestamp").textContent = report
+      ? `비교 기간 ${report.analysis_period.previous_7days} / ${report.analysis_period.current_7days} · 한국 시간`
+      : "선택 대상자의 주간 리포트가 연결되지 않았습니다.";
+
+    renderResidents();
+    renderCharts();
+    renderLive();
+    drawRoom();
+  }
+
+  function chartOptions(unit) {
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: item => `${item.parsed.y} ${unit}` } }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          border: { display: false },
+          ticks: { color: "#505a74", font: { size: 10 } }
+        },
+        y: {
+          beginAtZero: true,
+          border: { display: false },
+          grid: { color: "#e2e6f0" },
+          ticks: {
+            color: "#505a74",
+            font: { size: 9 },
+            maxTicksLimit: 3,
+            ...(unit === "건" ? { precision: 0 } : {})
+          }
+        }
+      }
+    };
+  }
+
+  function renderCharts() {
+    breathChart?.destroy();
+    warningChart?.destroy();
+
+    const report = current().report;
+    const breath = report?.comparison_metrics.breath_rate_bpm;
+    const distribution = report?.time_of_day_warning_distribution;
+
+    $("breathChart").setAttribute("aria-label", breath
+      ? `평균 호흡수 전주 ${breath.prev_7d}, 이번 주 ${breath.curr_7d} 회/분`
+      : "평균 호흡수 데이터 없음");
+
+    $("warningChart").setAttribute("aria-label", distribution
+      ? `주의 이벤트 새벽 ${distribution.dawn_00_06}건, 낮 ${distribution.day_06_18}건, 밤 ${distribution.night_18_24}건`
+      : "시간대별 데이터 없음");
+
+    if (!window.Chart) {
+      ["breathChart", "warningChart"].forEach(id => {
+        const canvas = $(id);
+        canvas.style.display = "none";
+        if (!canvas.parentElement.querySelector(".chart-fallback")) {
+          const message = document.createElement("div");
+          message.className = "small muted chart-fallback";
+          message.textContent = "차트 로드 불가 · 상세 표에서 확인";
+          canvas.parentElement.appendChild(message);
+        }
+      });
+      return;
+    }
+
+    Chart.defaults.font.family = "Arial, 'Malgun Gothic', sans-serif";
+
+    breathChart = new Chart($("breathChart"), {
+      type: "bar",
+      data: {
+        labels: ["전주", "이번 주"],
+        datasets: [{
+          data: breath ? [breath.prev_7d, breath.curr_7d] : [null, null],
+          backgroundColor: "#1751d0",
+          borderRadius: 3,
+          barThickness: 24
+        }]
+      },
+      options: chartOptions("회/분")
+    });
+
+    warningChart = new Chart($("warningChart"), {
+      type: "bar",
+      data: {
+        labels: ["새벽", "낮", "밤"],
+        datasets: [{
+          data: distribution
+            ? [distribution.dawn_00_06, distribution.day_06_18, distribution.night_18_24]
+            : [null, null, null],
+          backgroundColor: "#1751d0",
+          borderRadius: 3,
+          barThickness: 19
+        }]
+      },
+      options: chartOptions("건")
+    });
+  }
+
+  function renderLive() {
+    const resident = current();
+    const frame = connected(resident) ? resident.frame : null;
+    const status = frame?.status || "unknown";
+    const labels = {
+      normal: "정상",
+      warning: "주의",
+      emergency: "응급",
+      unknown: "판단 정보 없음"
+    };
+
+    $("liveBadge").textContent = frame ? "센서 수신" : "미연결";
+    $("liveBadge").dataset.status = status;
+    $("currentState").textContent = frame ? labels[status] : "확인 대기";
+    $("liveBreath").textContent = isNumber(frame?.breath_rate_bpm)
+      ? `${frame.breath_rate_bpm} 회/분` : "—";
+    $("livePosition").textContent = frame?.position
+      ? `${frame.position.x.toFixed(1)}, ${frame.position.z.toFixed(1)}m`
+      : "수신 대기";
+
+    $("lastReceived").textContent = frame
+      ? `최근 수신 ${new Date(resident.lastReceived).toLocaleTimeString("ko-KR")}`
+      : "실시간 데이터 없음 또는 30초 이상 미수신";
+
+    $("spaceBadge").textContent = frame
+      ? "센서 수신 · 예시 평면"
+      : demoPlaying ? "동작 데모 · 실제 위치 아님" : "공간 예시 · 미연결";
+
+    $("spaceStatus").textContent = frame
+      ? "수신 좌표 표시 중 · 평면은 예시입니다."
+      : demoPlaying ? "가상 움직임 재생 중 · 실제 관측이 아닙니다." : "실제 움직임 데이터 수신 대기";
+
+    $("positionLegend").textContent = frame?.position
+      ? "● 수신된 센서 위치"
+      : demoPlaying ? "● 데모 인물 / 이동 경로" : "○ 실제 위치 데이터 없음";
+
+    $("demoButton").textContent = demoPlaying ? "Ⅱ 데모 중지" : "▷ 움직임 데모";
+    $("demoButton").disabled = Boolean(frame) || resident === emptyResident;
+
+    $("eventList").innerHTML = resident.events.length
+      ? resident.events.slice(-3).reverse().map(event => `
+          <div class="event">
+            <strong>${escapeHTML(event.type)}</strong>
+            <span>${escapeHTML(new Date(event.at).toLocaleString("ko-KR"))}</span>
+          </div>`).join("")
+      : '<div class="empty">표시할 개별 이벤트 없음</div>';
+  }
+
+  /* ───────────────── 공간 렌더링 ─────────────────
+     실제 공간 모델이 없는 상태에서 사용하는 예시 도형입니다.
+     실제 적용 시 평면 치수, 가구, 센서 좌표계를 교체하세요.
+  */
+
+  function resizeRoom() {
+    roomWidth = $("canvasWrap").clientWidth;
+    roomHeight = $("canvasWrap").clientHeight;
+    const ratio = Math.min(window.devicePixelRatio || 1, 2);
+    roomCanvas.width = Math.round(roomWidth * ratio);
+    roomCanvas.height = Math.round(roomHeight * ratio);
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    drawRoom();
+  }
+
+  function project(x, z, height = 0) {
+    const scale = Math.min(roomWidth / 12.5, roomHeight / 7.7);
+    if (viewMode === "top") {
+      return [
+        roomWidth / 2 + (x - 3) * scale * 1.2,
+        roomHeight * .55 + (z - 2.5) * scale * 1.2
+      ];
+    }
+    return [
+      roomWidth / 2 + (x - z - .5) * scale,
+      roomHeight * .56 + (x + z - 5.5) * scale * .43 - height * scale
+    ];
+  }
+
+  function polygon(points, fill, stroke = "#c8d3e2") {
+    ctx.beginPath();
+    points.forEach((point, index) => {
+      const p = project(...point);
+      index ? ctx.lineTo(...p) : ctx.moveTo(...p);
+    });
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    if (stroke) {
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = .8;
+      ctx.stroke();
+    }
+  }
+
+  function line(a, b, color = "#dce4ee") {
+    ctx.beginPath();
+    ctx.moveTo(...project(...a));
+    ctx.lineTo(...project(...b));
+    ctx.strokeStyle = color;
+    ctx.lineWidth = .8;
+    ctx.stroke();
+  }
+
+  function box(x, z, width, depth, height, color) {
+    if (viewMode === "iso") {
+      polygon([
+        [x, z + depth, 0], [x + width, z + depth, 0],
+        [x + width, z + depth, height], [x, z + depth, height]
+      ], "#c8d4e3");
+
+      polygon([
+        [x + width, z, 0], [x + width, z + depth, 0],
+        [x + width, z + depth, height], [x + width, z, height]
+      ], "#b9c8db");
+    }
+
+    polygon([
+      [x, z, height], [x + width, z, height],
+      [x + width, z + depth, height], [x, z + depth, height]
+    ], color);
+  }
+
+  function textAt(text, x, z, height = 0) {
+    const p = project(x, z, height);
+    ctx.font = "10px Arial, 'Malgun Gothic', sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#505a74";
+    ctx.fillText(text, p[0], p[1]);
+  }
+
+  function drawSensor(x, z, label) {
+    const height = viewMode === "iso" ? 1.9 : 0;
+    if (viewMode === "iso") {
+      polygon([
+        [x, z, height],
+        [Math.max(0, x - 1.8), Math.min(5, z + 2.8), 0],
+        [Math.min(6, x + 1.8), Math.min(5, z + 2.8), 0]
+      ], "rgba(23,81,208,.045)", null);
+    }
+    const p = project(x, z, height);
+    ctx.beginPath();
+    ctx.arc(p[0], p[1], 5, 0, Math.PI * 2);
+    ctx.fillStyle = "#1751d0";
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(p[0], p[1], 10, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.strokeStyle = "#1751d0";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    const labelPosition = project(x, z, height);
+    ctx.font = "9px Arial, 'Malgun Gothic', sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#505a74";
+    ctx.fillText(`${label} · 배치 예시`, labelPosition[0], labelPosition[1] - 17);
+  }
+
+  function demoPosition(time) {
+    const path = [
+      [2.3, 3.6], [3.5, 3.5], [4.2, 2.8], [4.2, 1.7],
+      [3.3, 2.0], [2.6, 2.9], [2.3, 3.6]
+    ];
+    const progress = (time * .4) % (path.length - 1);
+    const index = Math.floor(progress);
+    const part = progress - index;
+    return {
+      x: path[index][0] + (path[index + 1][0] - path[index][0]) * part,
+      z: path[index][1] + (path[index + 1][1] - path[index][1]) * part
+    };
+  }
+
+  function drawPerson(position, label, status) {
+    const foot = project(position.x, position.z, 0);
+    const head = viewMode === "top"
+      ? [foot[0], foot[1] - 31]
+      : project(position.x, position.z, .95);
+
+    const color = status === "emergency" ? "#c1232c"
+      : status === "warning" ? "#a87f00" : "#1751d0";
+
+    ctx.beginPath();
+    ctx.ellipse(foot[0], foot[1], 21, 9, 0, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(23,81,208,.1)";
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(head[0], head[1] - 5, 5.5, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    ctx.lineCap = "round";
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.moveTo(head[0], head[1] + 7);
+    ctx.lineTo(foot[0], foot[1] - 14);
+    ctx.stroke();
+
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.moveTo(foot[0], foot[1] - 14);
+    ctx.lineTo(foot[0] - 5, foot[1] - 2);
+    ctx.moveTo(foot[0], foot[1] - 14);
+    ctx.lineTo(foot[0] + 5, foot[1] - 2);
+    ctx.moveTo(head[0], head[1] + 10);
+    ctx.lineTo(head[0] - 9, head[1] + 20);
+    ctx.moveTo(head[0], head[1] + 10);
+    ctx.lineTo(head[0] + 9, head[1] + 20);
+    ctx.stroke();
+    ctx.lineCap = "butt";
+
+    ctx.font = "bold 10px Arial, 'Malgun Gothic', sans-serif";
+    ctx.fillStyle = "#1e2433";
+    ctx.textAlign = "center";
+    ctx.fillText(label, head[0], head[1] - 22);
+  }
+
+  function drawRoom() {
+    if (!roomWidth || !roomHeight) return;
+    ctx.clearRect(0, 0, roomWidth, roomHeight);
+
+    polygon([[0,0,0], [6,0,0], [6,5,0], [0,5,0]], "#eaf0f6");
+
+    if (viewMode === "iso") {
+      polygon([[0,0,0], [6,0,0], [6,0,2], [0,0,2]], "#e0e7f0");
+      polygon([[0,0,0], [0,5,0], [0,5,2], [0,0,2]], "#edf1f6");
+      polygon([[.65,0,.85], [2.15,0,.85], [2.15,0,1.6], [.65,0,1.6]], "#fafdff");
+      line([1.4,0,.85], [1.4,0,1.6], "#bdcbdc");
+      polygon([[4.8,0,0], [5.6,0,0], [5.6,0,1.6], [4.8,0,1.6]], "#d3deeb");
+    }
+
+    for (let x = 1; x < 6; x++) line([x,0,0], [x,5,0]);
+    for (let z = 1; z < 5; z++) line([0,z,0], [6,z,0]);
+
+    box(.35, 2.5, 1.5, 2, .32, "#cfdaea");
+    box(.42, 2.57, 1.36, 1.85, .44, "#f8fbff");
+    box(.56, 2.72, 1.08, .4, .5, "#dce7f5");
+    box(.43, 3.65, 1.34, .75, .5, "#bed0e9");
+    box(4.3, .5, 1.3, .65, .8, "#d0ddec");
+    box(4.65, 1.45, .5, .5, .4, "#c0d0e5");
+
+    drawSensor(.15, .2, "S1");
+    drawSensor(5.8, .2, "S2");
+    textAt("침실 예시", 1.05, 4.85);
+    textAt("생활 공간 예시", 4.6, 4.75);
+    textAt("6m", 3, 5.45);
+
+    const resident = current();
+    const frame = connected(resident) ? resident.frame : null;
+    const position = frame?.position || (!frame && demoPlaying ? demoPosition(demoTime) : null);
+    const trail = frame ? resident.trail : demoPlaying
+      ? Array.from({ length: 30 }, (_, i) =>
+          demoPosition(Math.max(0, demoTime - (29 - i) * .09)))
+      : [];
+
+    if (trail.length > 1) {
+      ctx.beginPath();
+      trail.forEach((point, index) => {
+        const p = project(point.x, point.z, .02);
+        index ? ctx.lineTo(...p) : ctx.moveTo(...p);
+      });
+      ctx.strokeStyle = "#1751d0";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([3, 5]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    if (position) {
+      drawPerson(position, frame ? "센서 수신 위치" : "데모 인물", frame?.status);
+    } else {
+      textAt("실제 위치 데이터 수신 대기", 3.4, 2.7);
+    }
+  }
+
+  function animate(timestamp) {
+    const delta = previousAnimationTime
+      ? Math.min((timestamp - previousAnimationTime) / 1000, .1) : 0;
+    previousAnimationTime = timestamp;
+    if (demoPlaying) {
+      demoTime += delta;
+      drawRoom();
+    }
+    requestAnimationFrame(animate);
+  }
+
+  /* ───────────────── 상세 정보 ───────────────── */
+
+  function metricTable(report) {
+    return `
+      <table>
+        <thead><tr><th>지표</th><th>전주</th><th>이번 주</th><th>증감</th></tr></thead>
+        <tbody>
+          ${metricDefinitions.map(([key, label, unit]) => {
+            const metric = report.comparison_metrics[key];
+            return `<tr>
+              <td>${label}</td>
+              <td>${valueText(metric.prev_7d)} ${unit}</td>
+              <td>${valueText(metric.curr_7d)} ${unit}</td>
+              <td>${changeText(metric.change_pct)}</td>
+            </tr>`;
+          }).join("")}
+        </tbody>
+      </table>`;
+  }
+
+  function findingsHTML(report) {
+    return `
+      <div class="notice warning">
+        <b>${escapeHTML(report.care_priority)}</b><br>
+        시연용 참고 표시입니다. 현재 상태는 센서 상태에서 확인하세요.
+      </div>
+      <h3>전주 대비 건강 지표</h3>
+      ${metricTable(report)}
+      <h3>자동 분석 소견</h3>
+      ${report.summary_findings.map(text =>
+        `<div class="notice">${escapeHTML(text)}</div>`).join("")}
+      <p>${escapeHTML(report.disclaimer)}</p>`;
+  }
+
+  function buildDetail(type) {
+    const resident = current();
+    const report = resident.report;
+
+    if (type === "guide") return `
+      <h3>공간 시각화 구성</h3>
+      <p>
+        6 × 5m 예시 방, 침대·책상, 센서 2대, 인물 위치 및 이동 경로의 틀입니다.
+        실제 주거 평면, 센서 위치, 감지 범위를 나타내지는 않습니다.
+        3D와 평면 전환 및 움직임 데모를 사용할 수 있습니다.
+      </p>
+      <div class="notice warning">
+        움직임 데모는 가상 위치만 재생합니다.
+        현재 호흡수·정상/주의/응급 상태·개별 이벤트는 생성하지 않습니다.
+      </div>
+      <h3>센서 연동 인터페이스</h3>
+      <p>
+        신뢰할 수 있는 센서 수신 모듈에서 아래 형식으로 호출하세요.
+        좌표 단위는 m, 범위는 x: 0–6 / z: 0–5이며 원점은 방 뒤쪽 왼쪽입니다.
+        실제 적용 전 주거 평면과 센서 좌표계 보정이 필요합니다.
+      </p>
+      <pre>// 실제 수신 모듈에서 호출할 형식 예시입니다.
+// 이 예시 코드는 자동 실행되지 않습니다.
+window.CareMonitor.ingestFrame({
+  resident_id: "CARE-001",
+  timestamp: new Date().toISOString(),
+  position: { x: 2.8, z: 2.2 },
+  breath_rate_bpm: null,
+  status: "unknown",
+  events: []
+});
+
+// status: normal | warning | emergency | unknown
+// 이벤트 형식:
+// { type: "센서에서 판정한 이벤트명", at: "ISO 시각" }
+
+// 연결 해제
+window.CareMonitor.disconnect("CARE-001");</pre>
+      <p>
+        프레임 시각은 현재 ±30초 이내만 허용합니다.
+        이전·중복 프레임, 잘못된 타입, 범위 밖 좌표는 거절합니다.
+        30초 이상 수신이 없으면 현재 상태를 확인 대기로 표시합니다.
+        호흡수만으로 상태를 임의 판정하지 않으며 센서·서버가 전달한 상태를 표시합니다.
+      </p>
+      <h3>실제 서비스 전 필요한 작업</h3>
+      <p>
+        실제 평면과 장치 연결, 좌표 보정, 대상자 ID 매핑, 서버 인증·권한,
+        데이터 저장 정책, 응급 알림 및 대응 절차를 구현해야 합니다.
+        현재 화면은 로컬 DB 조회 및 공간 시연을 지원합니다.
+      </p>
+      <h3>화면 사용</h3>
+      <p>
+        왼쪽 대상자 선택 → 중앙 공간과 오른쪽 상태 확인 → 하단 주간 지표 확인 →
+        상세 버튼으로 근거 확인 순서입니다.
+        본 화면은 창에 맞춰 축소되며, 상세 창만 내부 스크롤을 사용합니다.
+        가독성을 위해 데스크톱 화면을 권장합니다.
+      </p>`;
+
+    if (type === "events") return `
+      <div class="notice">
+        DB의 최근 수신 로그를 최대 50건 보여줍니다. 한 사건이 여러 로그로 기록될 수 있습니다.
+      </div>
+      ${resident.events.length ? `
+        <table>
+          <thead><tr><th>발생 시각</th><th>이벤트</th></tr></thead>
+          <tbody>${resident.events.slice().reverse().map(event => `
+            <tr>
+              <td>${escapeHTML(new Date(event.at).toLocaleString("ko-KR"))}</td>
+              <td>${escapeHTML(event.type)}</td>
+            </tr>`).join("")}
+          </tbody>
+        </table>` : '<div class="empty">표시할 개별 이벤트가 없습니다.</div>'}`;
+
+    if (type === "data") return `
+      <h3>데이터 출처</h3>
+      <table>
+        <thead><tr><th>항목</th><th>출처 및 상태</th></tr></thead>
+        <tbody>
+          <tr><td>주간 지표·우선순위·소견</td><td>주간 지표·로그: PostgreSQL · 호흡수와 [시연] 대상자: 시연 데이터</td></tr>
+          <tr><td>현재 위치·호흡수·상태</td><td>초기 미연결 · 센서 입력 시 표시</td></tr>
+          <tr><td>공간·가구·센서 배치</td><td>시각화 틀을 위한 가상 예시</td></tr>
+          <tr><td>움직임 데모</td><td>가상 좌표 · 실제 관측 아님</td></tr>
+          <tr><td>[시연] 대상자</td><td>가상 시연 리포트 및 이벤트</td></tr>
+          <tr><td>14일 날짜별 호흡수</td><td>이 화면은 주간 평균을 표시</td></tr>
+        </tbody>
+      </table>
+      <h3>리포트에 기록된 데이터 관리 결과</h3>
+      <div class="notice">
+        ${report ? escapeHTML(report.retention_policy_result) : "선택 대상자 리포트 없음"}<br>
+        <b>리포트 문구를 표시한 것이며, 이 HTML이 실제 자동 폐기를 수행하지는 않습니다.</b>
+      </div>
+      <p>
+        연결 후 받은 센서 이력은 브라우저 메모리에 유지되며 새로고침하면 초기화됩니다.
+        DB에 저장된 로그는 서버에서 조회합니다.
+        차트는 외부 CDN의 Chart.js를 사용하므로 인터넷 연결이 필요합니다.
+        차트 로드에 실패해도 주요 수치와 상세 표는 확인할 수 있습니다.
+      </p>
+      <p>본 화면은 의료 진단 목적이 아닌 보조 참고용입니다.</p>`;
+
+    if (!report) return '<div class="empty">선택한 대상자의 주간 리포트가 없습니다.</div>';
+
+    if (type === "breath") {
+      const metric = report.comparison_metrics.breath_rate_bpm;
+      return `
+        <div class="notice">
+          제공된 값은 두 주의 평균입니다.
+          현재 호흡수는 메인 화면의 센서 상태에서 확인할 수 있습니다.
+        </div>
+        <table>
+          <thead><tr><th>구분</th><th>기간</th><th>평균 호흡수</th></tr></thead>
+          <tbody>
+            <tr><td>전주</td><td>${escapeHTML(report.analysis_period.previous_7days)}</td><td>${valueText(metric.prev_7d)} 회/분</td></tr>
+            <tr><td>이번 주</td><td>${escapeHTML(report.analysis_period.current_7days)}</td><td>${valueText(metric.curr_7d)} 회/분</td></tr>
+          </tbody>
+        </table>
+        <p>전주 대비 ${changeText(metric.change_pct)}</p>`;
+    }
+
+    if (type === "distribution") {
+      const d = report.time_of_day_warning_distribution;
+      const total = d.dawn_00_06 + d.day_06_18 + d.night_18_24;
+      return `
+        <table>
+          <thead><tr><th>시간대</th><th>주의 건수</th><th>구성비</th></tr></thead>
+          <tbody>
+            ${[
+              ["새벽 00–06시", d.dawn_00_06],
+              ["낮 06–18시", d.day_06_18],
+              ["밤 18–24시", d.night_18_24]
+            ].map(([label, count]) =>
+              `<tr><td>${label}</td><td>${count}건</td><td>${total ? (count / total * 100).toFixed(1) + "%" : "—"}</td></tr>`
+            ).join("")}
+          </tbody>
+        </table>
+        <p>주의 집중 시간: ${escapeHTML(d.most_vulnerable_time)}</p>
+        <p>시간대별 주간 집계이며 개별 발생 시각을 뜻하지 않습니다.</p>`;
+    }
+
+    if (type === "metrics") return metricTable(report);
+    return findingsHTML(report);
+  }
+
+  /* DB 조회 응답을 원본 리포트 필드에 맞춥니다. */
+  async function readJSON(url) {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    return response.json();
+  }
+
+  function compareMetric(before, recent, comparable = true) {
+    const change = comparable && isNumber(before) && before > 0 && isNumber(recent)
+      ? Number(((recent - before) / before * 100).toFixed(1))
+      : null;
+    return { prev_7d: before, curr_7d: recent, change_pct: change };
+  }
+
+  function adaptReport(resident, response) {
+    const previous = response.previous_week;
+    const recent = response.recent_week;
+    const range = week => week.start_date + " ~ " + week.end_date;
+    const hours = week => isNumber(week.total_activity_seconds)
+      ? Number((week.total_activity_seconds / 3600).toFixed(2)) : null;
+    const counts = recent.warning_logs_by_time;
+    const timeLabels = { dawn: "새벽(00~06시)", day: "낮(06~18시)", night: "밤(18~24시)" };
+    const highest = Object.keys(timeLabels).reduce((best, key) => counts[key] > counts[best] ? key : best, "dawn");
+    return {
+      analysis_period: { previous_7days: range(previous), current_7days: range(recent) },
+      care_priority: Object.hasOwn(reportNotes, resident.name) ? reportNotes[resident.name] : "평가 기준 미설정",
+      comparison_metrics: {
+        breath_rate_bpm: compareMetric(previous.average_bpm, recent.average_bpm,
+          response.comparison.status === "ready"),
+        total_active_hours: compareMetric(hours(previous), hours(recent),
+          previous.activity_days === 7 && recent.activity_days === 7),
+        warning_event_count: compareMetric(previous.warning_log_count, recent.warning_log_count),
+        emergency_event_count: compareMetric(previous.emergency_log_count, recent.emergency_log_count)
+      },
+      summary_findings: [
+        "호흡수 관측일은 그 이전 주 " + previous.measured_days + "/7일, 직전 주 " + recent.measured_days + "/7일입니다.",
+        "활동 시간은 기록된 구간의 합계입니다. 활동 기록이 있는 날은 " + previous.activity_days + "/7일 → " + recent.activity_days + "/7일입니다.",
+        "주의·응급 건수는 저장된 로그를 집계한 값입니다."
+      ],
+      disclaimer: "호흡수는 시연 관측값입니다. 리포트는 보조 참고용입니다.",
+      retention_policy_result: "이 조회에서 데이터 폐기 기록은 제공되지 않습니다.",
+      time_of_day_warning_distribution: {
+        dawn_00_06: counts.dawn, day_06_18: counts.day, night_18_24: counts.night,
+        most_vulnerable_time: counts[highest] ? timeLabels[highest] : "주의 기록 없음"
+      }
+    };
+  }
+
+  async function loadReport(resident) {
+    const request = ++reportRequest;
+    $("dbStatus").textContent = "DB에서 주간 리포트 조회 중";
+    const query = new URLSearchParams({ subject_id: resident.subjectId, report_date: reportDate });
+    try {
+      const response = await readJSON("/api/v1/care-report?" + query);
+      if (request !== reportRequest) return;
+      resident.report = adaptReport(resident, response);
+      const liveEvents = resident.events.filter(event => !event.fromDatabase);
+      const logs = response.event_logs.map(log => ({
+        type: log.event_type, at: log.logged_at, fromDatabase: true
+      }));
+      resident.events = [...logs, ...liveEvents.filter(event => !logs.some(log =>
+        log.type === event.type && Date.parse(log.at) === Date.parse(event.at)
+      ))].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+      $("dbStatus").textContent = "DB 조회 완료 · 호흡수는 시연 데이터";
+    } catch {
+      if (request !== reportRequest) return;
+      $("dbStatus").textContent = "리포트 조회 실패 · 서버와 DB를 확인하세요";
+    }
+    renderDashboard();
+    if ($("modalBackdrop").classList.contains("open")) {
+      $("modalBody").innerHTML = buildDetail(activeDetail);
+      $("modalSubtitle").textContent = modalSubtitle();
+    }
+  }
+
+  async function loadSubjects() {
+    try {
+      const subjects = await readJSON("/api/v1/care-subjects");
+      residents.push(...subjects.map(subject => ({
+        id: "CARE-" + subject.subject_id.padStart(3, "0"),
+        subjectId: subject.subject_id,
+        name: subject.display_name,
+        report: null, frame: null, lastReceived: 0, trail: [], events: []
+      })));
+      $("subjectCount").textContent = residents.length;
+      $("subjectBadge").textContent = residents.length + "명";
+      renderDashboard();
+      if (residents.length) await loadReport(current());
+      else $("dbStatus").textContent = "DB에 등록된 대상자가 없습니다";
+    } catch {
+      $("dbStatus").textContent = "대상자 조회 실패 · 서버와 DB를 확인하세요";
+    }
+  }
+
+  function modalSubtitle() {
+    return current().name + " · " + current().id +
+      (current().report ? " · " + current().report.analysis_period.current_7days : "");
+  }
+
+  function openModal(type) {
+    activeDetail = type;
+    previousFocus = document.activeElement;
+    const titles = {
+      report: "주간 돌봄 리포트",
+      breath: "주간 평균 호흡수",
+      metrics: "핵심 주간 지표",
+      distribution: "시간대별 주의 이벤트",
+      findings: "돌봄 우선순위 권고 근거",
+      events: "개별 이벤트 이력",
+      guide: "공간·센서 연동 안내",
+      data: "데이터 출처 및 관리"
+    };
+
+    $("modalTitle").textContent = titles[type] || "상세 정보";
+    $("modalSubtitle").textContent = modalSubtitle();
+    $("modalBody").innerHTML = buildDetail(type);
+    $("modalBody").scrollTop = 0;
+    $("modalBackdrop").classList.add("open");
+    $("modalBackdrop").setAttribute("aria-hidden", "false");
+    $("closeModal").focus();
+  }
+
+  function closeModal() {
+    $("modalBackdrop").classList.remove("open");
+    $("modalBackdrop").setAttribute("aria-hidden", "true");
+    previousFocus?.focus();
+  }
+
+  /* ───────────────── 실제 센서 연결 지점 ─────────────────
+     움직임 데모는 이 인터페이스를 호출하지 않습니다.
+     입력 상태는 센서/서버의 판정을 사용하며 화면이 의학적 판정을 하지 않습니다.
+  */
+  window.CareMonitor = {
+    ingestFrame(frame) {
+      if (!frame || typeof frame !== "object") {
+        return { ok: false, error: "프레임 객체가 필요합니다." };
+      }
+
+      const resident = residents.find(item => item.id === frame.resident_id);
+      if (!resident) return { ok: false, error: "등록되지 않은 대상자입니다." };
+
+      const timestamp = typeof frame.timestamp === "string"
+        ? Date.parse(frame.timestamp) : NaN;
+
+      if (!Number.isFinite(timestamp) || Math.abs(Date.now() - timestamp) > 30000) {
+        return { ok: false, error: "현재 시각 ±30초 이내의 timestamp가 필요합니다." };
+      }
+
+      if (resident.frame && timestamp <= Date.parse(resident.frame.timestamp)) {
+        return { ok: false, error: "중복 또는 이전 프레임입니다." };
+      }
+
+      const position = frame.position ?? null;
+      if (position !== null && (
+        !isNumber(position.x) || !isNumber(position.z) ||
+        position.x < 0 || position.x > 6 ||
+        position.z < 0 || position.z > 5
+      )) {
+        return { ok: false, error: "위치 범위: x 0–6m, z 0–5m." };
+      }
+
+      const breath = frame.breath_rate_bpm ?? null;
+      if (breath !== null && (!isNumber(breath) || breath < 0)) {
+        return { ok: false, error: "호흡수는 0 이상 숫자 또는 null이어야 합니다." };
+      }
+
+      const status = frame.status ?? "unknown";
+      if (!["normal", "warning", "emergency", "unknown"].includes(status)) {
+        return { ok: false, error: "지원하지 않는 상태 값입니다." };
+      }
+
+      const events = frame.events ?? [];
+      if (!Array.isArray(events) || events.some(event =>
+        !event || typeof event.type !== "string" ||
+        !event.type.trim() || event.type.length > 100 ||
+        typeof event.at !== "string" || !Number.isFinite(Date.parse(event.at))
+      )) {
+        return { ok: false, error: "이벤트에는 type 문자열과 유효한 at 시각이 필요합니다." };
+      }
+
+      if (!connected(resident)) resident.trail = [];
+
+      resident.frame = {
+        timestamp: frame.timestamp,
+        position: position ? { x: position.x, z: position.z } : null,
+        breath_rate_bpm: breath,
+        status
+      };
+      resident.lastReceived = Date.now();
+
+      if (position) {
+        resident.trail.push({ x: position.x, z: position.z });
+        resident.trail = resident.trail.slice(-100);
+      } else {
+        resident.trail = [];
+      }
+
+      for (const event of events) {
+        const duplicate = resident.events.some(old =>
+          old.type === event.type && Date.parse(old.at) === Date.parse(event.at));
+        if (!duplicate) resident.events.push({ type: event.type, at: event.at });
+      }
+
+      resident.events.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+      resident.events = resident.events.slice(-200);
+
+      if (resident === current()) {
+        demoPlaying = false;
+        renderLive();
+        drawRoom();
+      }
+      renderResidents();
+      return { ok: true };
+    },
+
+    disconnect(residentId) {
+      const resident = residents.find(item => item.id === residentId);
+      if (!resident) return { ok: false, error: "대상자를 찾을 수 없습니다." };
+
+      resident.frame = null;
+      resident.lastReceived = 0;
+      resident.trail = [];
+      renderResidents();
+      renderLive();
+      drawRoom();
+      return { ok: true };
+    }
+  };
+
+  /* ───────────────── 화면 조작 ───────────────── */
+
+  $("search").addEventListener("input", renderResidents);
+
+  $("residentList").addEventListener("click", event => {
+    const button = event.target.closest("[data-person]");
+    if (!button) return;
+    selectedIndex = Number(button.dataset.person);
+    demoPlaying = false;
+    demoTime = 0;
+    renderDashboard();
+    void loadReport(current());
+  });
+
+  function setFilter(value) {
+    filter = value;
+    renderResidents();
+  }
+
+  document.querySelectorAll("[data-filter]").forEach(button =>
+    button.addEventListener("click", () => setFilter(button.dataset.filter)));
+
+  $("summaryAll").addEventListener("click", () => setFilter("all"));
+  $("summaryPriority").addEventListener("click", () => setFilter("priority"));
+
+  function setView(mode) {
+    viewMode = mode;
+    $("isoButton").classList.toggle("active", mode === "iso");
+    $("topButton").classList.toggle("active", mode === "top");
+    $("isoButton").setAttribute("aria-pressed", String(mode === "iso"));
+    $("topButton").setAttribute("aria-pressed", String(mode === "top"));
+    drawRoom();
+  }
+
+  $("isoButton").addEventListener("click", () => setView("iso"));
+  $("topButton").addEventListener("click", () => setView("top"));
+  $("resetButton").addEventListener("click", () => {
+    demoTime = 0;
+    setView("iso");
+  });
+
+  $("demoButton").addEventListener("click", () => {
+    if (connected(current())) return;
+    demoPlaying = !demoPlaying;
+    renderLive();
+    drawRoom();
+  });
+
+  document.querySelectorAll("[data-detail]").forEach(button =>
+    button.addEventListener("click", () => openModal(button.dataset.detail)));
+
+  $("closeModal").addEventListener("click", closeModal);
+  $("closeModalBottom").addEventListener("click", closeModal);
+
+  $("modalBackdrop").addEventListener("click", event => {
+    if (event.target === $("modalBackdrop")) closeModal();
+  });
+
+  document.addEventListener("keydown", event => {
+    if (!$("modalBackdrop").classList.contains("open")) return;
+    if (event.key === "Escape") closeModal();
+
+    if (event.key === "Tab") {
+      const controls = [...$("modalBackdrop").querySelectorAll(
+        'button, a[href], input, select, textarea, [tabindex="0"]'
+      )].filter(element => !element.disabled && element.offsetParent !== null);
+
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    }
+  });
+
+  window.addEventListener("resize", fitScreen);
+
+  if (window.ResizeObserver) {
+    new ResizeObserver(resizeRoom).observe($("canvasWrap"));
+  } else {
+    window.addEventListener("resize", resizeRoom);
+  }
+
+  setInterval(() => {
+    renderResidents();
+    renderLive();
+    if (!demoPlaying) drawRoom();
+  }, 1000);
+
+  fitScreen();
+  renderDashboard();
+  resizeRoom();
+  requestAnimationFrame(animate);
+  void loadSubjects();
+})();
+</script>
+</body>
+</html>

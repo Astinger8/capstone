@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="첨부한 주간 리포트의 호흡, 활동, 이벤트 비교">
+  <title>주간 상태 리포트 | 후점핑</title>
+  <link rel="stylesheet" href="/dashboard-assets/dashboard.css">
+  <link rel="stylesheet" href="/dashboard-assets/weekly-report.css">
+  <script src="/dashboard-assets/weekly-report.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="shell topbar-inner">
+      <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 36 36" aria-hidden="true">
+          <path d="M6 19h6l4-8 4 14 4-8h6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span><strong>후점핑</strong><small>캡스톤디자인</small></span>
+      </div>
+      <span id="file-status" class="connection" role="status">불러오는 중</span>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="intro weekly-intro" aria-labelledby="title">
+      <div>
+        <span class="demo-badge">첨부 리포트</span>
+        <h1 id="title">주간 상태 리포트</h1>
+        <p>호흡수, 활동 시간, 이벤트 건수를 두 주에 걸쳐 비교합니다.</p>
+      </div>
+      <a class="back-link" href="/">호흡수 추세 보기 <span aria-hidden="true">↗</span></a>
+    </section>
+
+    <p id="file-error" class="message error" role="alert" hidden></p>
+
+    <section id="weekly-content" aria-label="첨부 파일의 주간 비교" hidden>
+      <div class="report-meta">
+        <div class="period"><span class="dot previous"></span><div><strong>직전 7일</strong><span id="previous-period"></span></div></div>
+        <div class="period"><span class="dot recent"></span><div><strong>최근 7일</strong><span id="current-period"></span></div></div>
+        <div class="priority"><span>파일의 돌봄 우선순위</span><strong id="priority"></strong></div>
+      </div>
+
+      <div id="weekly-metrics" class="metrics weekly-metrics" aria-label="두 주 지표 비교"></div>
+
+      <div class="weekly-panels">
+        <section class="chart-panel" aria-labelledby="distribution-title">
+          <div class="panel-heading">
+            <div><h2 id="distribution-title">시간대별 주의 발생</h2><p>첨부 리포트에 기록된 건수</p></div>
+          </div>
+          <ul id="distribution" class="distribution"></ul>
+          <p class="peak"><span>가장 많이 발생한 시간대</span> <strong id="peak-time"></strong></p>
+        </section>
+
+        <section class="chart-panel" aria-labelledby="findings-title">
+          <div class="panel-heading">
+            <div><h2 id="findings-title">리포트 요약</h2><p>파일에 포함된 분석 문구</p></div>
+          </div>
+          <ul id="findings" class="findings"></ul>
+        </section>
+      </div>
+
+      <div class="report-notes">
+        <p><strong>파일의 보관 처리 기록</strong> <span id="retention"></span></p>
+        <p id="disclaimer"></p>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <span id="file-source">출처 · weekly_report_ui.json</span>
+      <a href="/docs">API 문서 <span aria-hidden="true">↗</span></a>
+    </footer>
+  </main>
+</body>
+</html>
