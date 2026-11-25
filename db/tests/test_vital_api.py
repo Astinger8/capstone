@@ -84,8 +84,33 @@ class VitalAPITests(unittest.TestCase):
         self.assertEqual(connection.parameters, (
             1, datetime(2026, 11, 7, 7, 48, 59, tzinfo=timezone.utc),
             "NORMAL", 60, Decimal("12.2"), Decimal("10.0"), Decimal("16.7"),
-            Decimal("66.7"), Decimal("3.5"),
+            Decimal("66.7"), Decimal("3.5"), None,
         ))
+
+    def test_radar_summary_with_valid_sample_count_maps_and_commits(self):
+        packet = {**SUMMARY, "valid_sample_count": 520}
+        connection = FakeConnection()
+        with patch("vital_api.connect_db", return_value=connection):
+            response = self.client.post("/api/v1/vital-summary", json=packet)
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(connection.committed)
+        self.assertIn("valid_sample_count", connection.query)
+        self.assertEqual(connection.parameters[-1], 520)
+
+    def test_summary_allows_zero_valid_samples_when_breathing_stats_are_null(self):
+        packet = {
+            **SUMMARY,
+            "avg_breath_rate": None,
+            "min_breath_rate": None,
+            "max_breath_rate": None,
+            "valid_sample_count": 0,
+            "avg_heart_rate": None,
+        }
+        connection = FakeConnection()
+        with patch("vital_api.connect_db", return_value=connection):
+            response = self.client.post("/api/v1/vital-summary", json=packet)
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(connection.parameters[4:10], (None, None, None, None, Decimal("3.5"), 0))
 
     def test_offset_timestamp_preserves_instant(self):
         packet = {**EVENT, "timestamp": "2026-11-07T07:48:33Z"}
@@ -127,6 +152,8 @@ class VitalAPITests(unittest.TestCase):
             {"period_seconds": 0}, {"period_seconds": 60.5},
             {"active_time_sec": 61}, {"min_breath_rate": 20},
             {"avg_breath_rate": 30}, {"packet_type": "DETAILED_EVENT_LOG"},
+            {"valid_sample_count": -1}, {"valid_sample_count": 12.5},
+            {"valid_sample_count": True}, {"valid_sample_count": 0},
         ]
         for change in changes:
             with self.subTest(change=change), patch("vital_api.connect_db") as connect:
@@ -198,6 +225,17 @@ class VitalAPITests(unittest.TestCase):
         replay = FakeConnection(rows=[None, (101, *first.parameters[:-2])])
         with patch("vital_api.connect_db", return_value=replay):
             response = self.client.post("/api/v1/vital-events", json={**packet, "breath_rate": 16})
+        self.assertEqual(response.status_code, 409)
+        self.assertFalse(replay.committed)
+
+    def test_reused_summary_identifier_with_changed_valid_sample_count_is_rejected(self):
+        packet = {**SUMMARY, "valid_sample_count": 500, "source_id": "demo-radar", "message_id": "s-001"}
+        first = FakeConnection()
+        with patch("vital_api.connect_db", return_value=first):
+            self.client.post("/api/v1/vital-summary", json=packet)
+        replay = FakeConnection(rows=[None, (101, *first.parameters[:-2])])
+        with patch("vital_api.connect_db", return_value=replay):
+            response = self.client.post("/api/v1/vital-summary", json={**packet, "valid_sample_count": 501})
         self.assertEqual(response.status_code, 409)
         self.assertFalse(replay.committed)
 

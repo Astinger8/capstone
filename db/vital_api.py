@@ -12,10 +12,17 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from breathing_report import DEMO_REPORT_DATE, load_daily_readings, report_payload
 from care_report import load_care_report
 from postgres_db import connect_db, psycopg
+from summary_report import (
+    DEFAULT_MIN_MEASURED_DAYS,
+    ReportSource,
+    load_saved_weekly_reports,
+    load_summary_report,
+)
 
 KST = timezone(timedelta(hours=9))
 Measurement = Annotated[Decimal, Field(ge=0, allow_inf_nan=False)]
 Coordinate = Annotated[Decimal, Field(allow_inf_nan=False)]
+SampleCount = Annotated[int, Field(strict=True, ge=0, le=2**31 - 1)]
 PacketIdentifier = Annotated[str, Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")]
 logger = logging.getLogger(__name__)
 
@@ -77,6 +84,7 @@ class VitalSummary(Packet):
     avg_breath_rate: Measurement | None = None
     min_breath_rate: Measurement | None = None
     max_breath_rate: Measurement | None = None
+    valid_sample_count: SampleCount | None = None
     avg_heart_rate: Measurement | None = None
     active_time_sec: Measurement | None = None
 
@@ -85,6 +93,8 @@ class VitalSummary(Packet):
         if self.active_time_sec is not None and self.active_time_sec > self.period_seconds:
             raise ValueError("active_time_sec must not exceed period_seconds")
         low, avg, high = self.min_breath_rate, self.avg_breath_rate, self.max_breath_rate
+        if self.valid_sample_count == 0 and any(v is not None for v in (low, avg, high)):
+            raise ValueError("breath rate stats must be null when valid_sample_count is 0")
         if low is not None and high is not None and low > high:
             raise ValueError("min_breath_rate must not exceed max_breath_rate")
         if avg is not None and low is not None and avg < low:
@@ -185,10 +195,10 @@ def receive_summary(packet: VitalSummary):
     record_id = insert_record(
         "public.vital_summaries", "summary_id",
         "subject_id, summary_at, status_level, period_seconds, avg_breath_rate, "
-        "min_breath_rate, max_breath_rate, avg_heart_rate, active_time_sec",
+        "min_breath_rate, max_breath_rate, avg_heart_rate, active_time_sec, valid_sample_count",
         (subject_id, packet.timestamp, packet.status_level, packet.period_seconds,
          packet.avg_breath_rate, packet.min_breath_rate, packet.max_breath_rate,
-         packet.avg_heart_rate, packet.active_time_sec),
+         packet.avg_heart_rate, packet.active_time_sec, packet.valid_sample_count),
         packet,
     )
     return StoredPacket(record_id=record_id, subject_id=subject_id)
@@ -258,3 +268,54 @@ def read_care_report(
     except psycopg.Error as exc:
         logger.error("PostgreSQL care report query failed (%s)", type(exc).__name__)
         raise HTTPException(status_code=500, detail="Could not read the care report.") from None
+
+
+@app.get("/api/v1/summary-report", responses={404: {"description": "Subject not registered"}})
+def read_summary_report(
+    subject_id: Annotated[int, Query(gt=0, le=2**63 - 1)] = 1,
+    report_date: Annotated[date, Query(ge=date.min + timedelta(days=14))] = DEMO_REPORT_DATE,
+    source: ReportSource = "auto",
+    min_measured_days: Annotated[int, Query(ge=1, le=7)] = DEFAULT_MIN_MEASURED_DAYS,
+) -> dict:
+    """Compare 14 completed KST days using vital_summaries (weighted by valid_sample_count) and archived daily_summaries."""
+    try:
+        with connect_db() as connection:
+            connection.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
+            subject = connection.execute(
+                "SELECT 1 FROM public.subjects WHERE subject_id = %s", (subject_id,)
+            ).fetchone()
+            if subject is None:
+                raise HTTPException(status_code=404, detail="subject_id is not registered.")
+            return load_summary_report(
+                connection,
+                subject_id,
+                report_date,
+                source=source,
+                min_measured_days=min_measured_days,
+            )
+    except (psycopg.OperationalError, psycopg.InterfaceError):
+        raise HTTPException(status_code=503, detail="PostgreSQL is unavailable; check server settings.") from None
+    except psycopg.Error as exc:
+        logger.error("PostgreSQL summary report query failed (%s)", type(exc).__name__)
+        raise HTTPException(status_code=500, detail="Could not read the summary report.") from None
+
+
+@app.get("/api/v1/weekly-reports", responses={404: {"description": "Subject not registered"}})
+def read_weekly_reports(
+    subject_id: Annotated[int, Query(gt=0, le=2**63 - 1)] = 1,
+    limit: Annotated[int, Query(ge=1, le=52)] = 12,
+) -> list[dict]:
+    """List persisted weekly health reports (365-day retention) for a subject."""
+    try:
+        with connect_db() as connection:
+            subject = connection.execute(
+                "SELECT 1 FROM public.subjects WHERE subject_id = %s", (subject_id,)
+            ).fetchone()
+            if subject is None:
+                raise HTTPException(status_code=404, detail="subject_id is not registered.")
+            return load_saved_weekly_reports(connection, subject_id, limit=limit)
+    except (psycopg.OperationalError, psycopg.InterfaceError):
+        raise HTTPException(status_code=503, detail="PostgreSQL is unavailable; check server settings.") from None
+    except psycopg.Error as exc:
+        logger.error("PostgreSQL weekly reports query failed (%s)", type(exc).__name__)
+        raise HTTPException(status_code=500, detail="Could not read weekly reports.") from None
