@@ -369,10 +369,21 @@ class AdvancedVitalProcessor:
       2단계: 3D Kalman Filter 대상 추적 및 Range Bin 산출
       3단계: Phase Extraction & Unwrapping + 선형 드리프트 제거
       4단계: Median Filter + 0.1~0.5 Hz Butterworth Bandpass Filter
-      5단계: FFT(Zero-padding) vs Peak Detection 동시 추정 + 안정화 + 상태 분류
+      5단계: FFT(Zero-padding) vs Peak Detection 동시 추정 + 안정화 + 상태 분류 (히스테리시스/디바운스 포함)
     """
 
-    def __init__(self, fs: float = 1.0 / 0.09, window_sec: float = 20.0, min_window_sec: float = 10.0, smooth_size: int = 7):
+    def __init__(
+        self,
+        fs: float = 1.0 / 0.09,
+        window_sec: float = 20.0,
+        min_window_sec: float = 10.0,
+        smooth_size: int = 7,
+        warning_hold_sec: float = 3.0,
+        apnea_hold_sec: float = 5.0,
+        recover_hold_sec: float = 1.5,
+        apnea_dev_threshold: float = 0.012,
+        pc_hold_frames: int = 20,
+    ):
         self.fs = fs
         self.pc_preprocessor = PointCloudPreprocessor(
             roi={"x_min": -3.0, "x_max": 3.0, "y_min": 0.1, "y_max": 5.0, "z_min": -2.0, "z_max": 2.0},
@@ -380,7 +391,8 @@ class AdvancedVitalProcessor:
             dbscan_eps=0.50,
             dbscan_min_samples=3,
         )
-        self.kalman_tracker = KalmanTracker3D(dt=1.0 / fs)
+        # 정지 착석 시 포인트가 수 초간 적게 나와도 트랙이 끊기지 않도록 max_missed_frames 여유 확보 (~7.2초)
+        self.kalman_tracker = KalmanTracker3D(dt=1.0 / fs, max_missed_frames=80)
         self.breath_pipeline = BreathingSignalPipeline(
             fs=fs,
             window_sec=window_sec,
@@ -393,10 +405,26 @@ class AdvancedVitalProcessor:
         self.ti_br_buffer = deque(maxlen=smooth_size)
         self.hr_buffer = deque(maxlen=smooth_size)
 
+        # 정지 상태 프레임 간 유효점 순간 0 드롭 완화용 최근 포인트 클라우드 홀드 버퍼
+        self.pc_hold_frames = pc_hold_frames
+        self._last_valid_pc = np.empty((0, 5))
+        self._empty_pc_streak = 0
+
+        # 상태 판별 디바운스(연속 유지 시간) 파라미터 및 상태 변수
+        self.warning_hold_sec = warning_hold_sec
+        self.apnea_hold_sec = apnea_hold_sec
+        self.recover_hold_sec = recover_hold_sec
+        self.apnea_dev_threshold = apnea_dev_threshold
+
+        self.stable_status = "MEASURING"
+        self._pending_status: str | None = None
+        self._pending_since: float | None = None
+        self._no_target_since: float | None = None
+
     def process_point_cloud_and_track(self, raw_point_cloud, ti_track_data=None):
         """
         1~2단계: 포인트 클라우드 정적 노이즈 제거 + DBSCAN 클러스터링 + PC Kalman Filter 추적
-        - 포인트가 일시적으로 적어 DBSCAN 클러스터가 안 잡히면 TI 보드 trackData 좌표를 보조 측정치로 활용
+        - 정지 상태에서 포인트가 일시적으로 0~2개로 줄어도 TI trackData 및 최근 포인트 홀드로 안정화
         """
         clean_pc, centroid, pc_stats = self.pc_preprocessor.filter_and_cluster(
             raw_point_cloud, prev_target_pos=self.kalman_tracker.position
@@ -409,8 +437,23 @@ class AdvancedVitalProcessor:
             measurement = np.array([float(t[1]), float(t[2]), float(t[3])], dtype=float)
 
         target_info = self.kalman_tracker.update(measurement)
-        valid_num_points = len(clean_pc)
-        return clean_pc, valid_num_points, target_info, pc_stats
+
+        # 정지 호흡 중 순간적으로 포인트가 0개가 되더라도 대상자 추적 중이면 최근 유효 점군을 짧게 유지
+        if len(clean_pc) > 0:
+            self._last_valid_pc = clean_pc
+            self._empty_pc_streak = 0
+            display_pc = clean_pc
+        elif target_info["id"] is not None and len(self._last_valid_pc) > 0 and self._empty_pc_streak < self.pc_hold_frames:
+            self._empty_pc_streak += 1
+            display_pc = self._last_valid_pc
+        else:
+            self._empty_pc_streak += 1
+            if target_info["id"] is None:
+                self._last_valid_pc = np.empty((0, 5))
+            display_pc = clean_pc
+
+        valid_num_points = len(display_pc)
+        return display_pc, valid_num_points, target_info, pc_stats
 
     def estimate_posture(self, target_id, z_height):
         """Z축 높이 기반 3D 아바타 자세(Action) 1차 추정"""
@@ -423,13 +466,92 @@ class AdvancedVitalProcessor:
         else:
             return "LYING"
 
-    def process_vitals(self, breath_waveform, raw_br_ti, raw_hr_ti, breath_dev, is_moving, valid_num_points):
+    def _update_debounced_status(self, raw_status: str, now_sec: float, target_present: bool) -> str:
+        """
+        단일 프레임 노이즈로 인한 상태 깜빡임(채터링)을 방지하기 위한 연속 유지 시간 기반 상태 전이
+        - WARNING: 비정상 호흡수(10 미만 / 25 초과)가 warning_hold_sec(기본 3초) 이상 지속 시 전환
+        - EMERGENCY: 대상자 존재 + 정지 상태에서 무호흡 의심 신호가 apnea_hold_sec(기본 5초) 이상 지속 시 전환
+        - NORMAL 복귀: 정상 범위가 recover_hold_sec(기본 1.5초) 이상 유지 시 복귀
+        """
+        if not target_present and raw_status == "MEASURING":
+            if self._no_target_since is None:
+                self._no_target_since = now_sec
+            elif now_sec - self._no_target_since >= 3.0:
+                self.stable_status = "MEASURING"
+                self._pending_status = None
+                self._pending_since = None
+            return self.stable_status
+        else:
+            self._no_target_since = None
+
+        # 워밍업 단계에서 최초 정상 측정이 들어오면 즉시 NORMAL 진입
+        if self.stable_status == "MEASURING":
+            if raw_status == "NORMAL":
+                self.stable_status = "NORMAL"
+                self._pending_status = None
+                self._pending_since = None
+                return self.stable_status
+            if raw_status == "MEASURING":
+                self._pending_status = None
+                self._pending_since = None
+                return self.stable_status
+
+        if raw_status == self.stable_status:
+            self._pending_status = None
+            self._pending_since = None
+            return self.stable_status
+
+        if self._pending_status != raw_status:
+            self._pending_status = raw_status
+            self._pending_since = now_sec
+            return self.stable_status
+
+        elapsed = now_sec - (self._pending_since if self._pending_since is not None else now_sec)
+        if raw_status == "EMERGENCY":
+            required = self.apnea_hold_sec
+        elif raw_status == "WARNING":
+            required = self.warning_hold_sec
+        elif raw_status == "NORMAL":
+            required = self.recover_hold_sec
+        else:
+            required = 3.0
+
+        if elapsed >= required:
+            self.stable_status = raw_status
+            self._pending_status = None
+            self._pending_since = None
+
+        return self.stable_status
+
+    def process_vitals(
+        self,
+        breath_waveform,
+        raw_br_ti,
+        raw_hr_ti,
+        breath_dev,
+        is_moving,
+        valid_num_points,
+        target_present: bool | None = None,
+        now_sec: float | None = None,
+    ):
         """
         3~5단계: 위상 언래핑 -> 0.1~0.5Hz BPF -> FFT / Peak Detection 추정 및 정상·주의·응급 판별
+        - TI 보드가 트랙 일시 끊김 시 송신하는 all-zero(0 배열) 파형 유입을 차단해 버퍼 오염 방지
+        - 연속 유지 시간 기반 디바운스로 정상 호흡 중 순간적인 상태 흔들림 방지
         """
-        # PC 파이프라인에 새 호흡 파형 청크 추가 (TI Vital Signs TLV의 15샘플 배열 또는 I/Q 샘플)
+        now = time.time() if now_sec is None else float(now_sec)
+        if target_present is None:
+            target_present = valid_num_points > 0
+
+        # all-zero(유효 신호 없음) 파형 차단 후 PC 파이프라인 버퍼에 추가
         if breath_waveform is not None and len(breath_waveform) > 0:
-            self.breath_pipeline.push_samples(breath_waveform, deduplicate=True)
+            wave_arr = np.asarray(breath_waveform)
+            if np.iscomplexobj(wave_arr):
+                has_signal = float(np.max(np.abs(wave_arr))) > 1e-8
+            else:
+                has_signal = float(np.max(np.abs(wave_arr))) > 1e-7
+            if has_signal:
+                self.breath_pipeline.push_samples(wave_arr, deduplicate=True)
 
         est = self.breath_pipeline.process_current_buffer(is_moving=is_moving)
 
@@ -451,17 +573,19 @@ class AdvancedVitalProcessor:
 
         clean_hr = float(np.median(self.hr_buffer)) if len(self.hr_buffer) > 0 else 0.0
 
-        # 3단계 상태 판별 (정상 / 주의 / 응급)
-        if clean_br == 0.0:
-            status = "MEASURING"
+        # 1차 프레임별 상태 산출 (대상자 존재 + 정지 + 유효 편차 급감 시 무호흡 후보)
+        # 참고: TI IWR6843 Vital Signs에서 breath_dev == 0.0은 미감지(No Patient)이므로 제외
+        if target_present and not is_moving and (0.0 < breath_dev < self.apnea_dev_threshold):
+            raw_status = "EMERGENCY"
+        elif clean_br == 0.0:
+            raw_status = "MEASURING"
         elif clean_br < 10.0 or clean_br > 25.0:
-            status = "WARNING"
+            raw_status = "WARNING"
         else:
-            status = "NORMAL"
+            raw_status = "NORMAL"
 
-        # 유효 포인트 존재 + 정지 상태인데 호흡 편차가 극도로 낮으면 무호흡 응급 판정
-        if valid_num_points >= 5 and not is_moving and breath_dev < 0.0008:
-            status = "EMERGENCY"
+        # 2차 연속 유지 시간(디바운스) 필터로 최종 안정화 상태 결정
+        status = self._update_debounced_status(raw_status, now_sec=now, target_present=target_present)
 
         return round(clean_br, 1), round(clean_hr, 1), status, est
 
@@ -530,9 +654,11 @@ def run_live_radar(args):
                 breath_dev = float(v.get('breathDeviation', 0.0))
                 breath_wave = v.get('breathWaveform', [])
 
+                target_present = (target_info["id"] is not None) or (raw_targets > 0) or (valid_num_points >= 3)
                 clean_br, clean_hr, status, est = processor.process_vitals(
                     breath_wave, raw_br_ti, raw_hr_ti, breath_dev,
-                    target_info["is_moving"], valid_num_points
+                    target_info["is_moving"], valid_num_points,
+                    target_present=target_present,
                 )
 
                 if est.is_valid:
@@ -644,7 +770,9 @@ def run_simulation_mode(args):
             # CSV에는 복소 I/Q를 바로 리플레이 가능하도록 Clutter 제거 후 위상 파형으로 기록
             clean_br, _, status, est = processor.process_vitals(
                 chunk_iq, raw_br_ti=0.0, raw_hr_ti=72.0, breath_dev=0.04,
-                is_moving=target_info["is_moving"], valid_num_points=valid_num_points
+                is_moving=target_info["is_moving"], valid_num_points=valid_num_points,
+                target_present=(target_info["id"] is not None),
+                now_sec=(frame_num + 1) / fs,
             )
             if est.is_valid:
                 comparator.add_record(
